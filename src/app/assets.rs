@@ -92,7 +92,8 @@ icon_assets!(
         GripVertical,
         FileSearch,
         SquareDashedText,
-        CopyPlus
+        CopyPlus,
+        CloudSync
     ]
 );
 

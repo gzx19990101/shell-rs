@@ -20,7 +20,7 @@ use crate::cli::{
     find_host, find_saved_host, host_details, host_info, host_secrets, plan_credential, plan_host,
     with_saved_credential_secrets, with_saved_passwords,
 };
-use crate::host::{CredentialId, HostId, HostStore};
+use crate::host::{CredentialId, CredentialKind, HostId, HostStore};
 use crate::i18n::t;
 use crate::secrets::{SecretRef, SharedSecretStore};
 use crate::terminal::{RunFailure, RunHandle, TerminalLifecycle, TerminalPanel};
@@ -358,6 +358,22 @@ fn save_credential(
                 )
             })?;
         draft = draft.with_key_path(path);
+    } else if let Some(path) = draft
+        .key_path
+        .clone()
+        .filter(|_| draft.kind == CredentialKind::Key)
+    {
+        // A key file named is copied among ShellRS's own keys, as the
+        // credential form does: that is what syncs.
+        let kept = store.keep_key_file(existing, &path).map_err(|error| {
+            CliError::new(
+                ErrorCode::SaveFailed,
+                t!("cli.change.key_not_copied", error = error),
+            )
+        })?;
+        if let Some(kept) = kept {
+            draft = draft.with_key_path(kept);
+        }
     }
     let (id, failures) = store.capture_failures(cx, |store, cx| match existing {
         Some(id) => {

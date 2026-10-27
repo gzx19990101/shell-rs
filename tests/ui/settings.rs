@@ -456,7 +456,7 @@ fn the_window_settings_are_on_until_turned_off(cx: &mut TestAppContext) {
     in_frame(cx, handle, |window, cx| window.click("open-settings", cx));
     // 应用 comes right before 关于.
     in_frame(cx, handle, |window, cx| {
-        window.within("settings").click("0-6", cx)
+        window.within("settings").click("0-7", cx)
     });
     let switch = |item: usize| {
         move |window: &mut gpui_kit::Window| {
@@ -481,8 +481,8 @@ fn the_window_settings_are_on_until_turned_off(cx: &mut TestAppContext) {
     assert!(settings.remember_size && !settings.remember_position);
 }
 
-/// 外观 › 常规 › 界面字号: gpui-kit's 16, marked as the default, until
-/// changed; a change sizes the interface at once.
+/// 外观 › 常规 › 界面字号: the platform's default (16, or 14 on Windows),
+/// marked as such, until changed; a change sizes the interface at once.
 #[gpui_kit::test]
 fn the_interface_font_size_is_set_on_the_appearance_page(cx: &mut TestAppContext) {
     let (handle, workspace) = open_workspace(cx);
@@ -493,23 +493,23 @@ fn the_interface_font_size_is_set_on_the_appearance_page(cx: &mut TestAppContext
     });
     in_frame(cx, handle, |window, _| {
         assert_eq!(
-            appearance_dropdown(window, 2).as_deref(),
-            Some("16（默认）")
+            appearance_dropdown(window, 2),
+            Some(format!("{DEFAULT_INTERFACE_FONT_SIZE}（默认）"))
         )
     });
-    cx.update(|cx| assert_eq!(cx.theme().font_size.as_f32(), 16.));
+    cx.update(|cx| assert_eq!(cx.theme().font_size.as_f32(), DEFAULT_INTERFACE_FONT_SIZE));
 
     let settings = cx.update(|cx| workspace.read(cx).settings().clone());
     cx.update(|cx| {
         settings.update(cx, |settings, cx| {
-            settings.update(|settings| settings.interface.font_size = 14., cx)
+            settings.update(|settings| settings.interface.font_size = 18., cx)
         })
     });
     cx.run_until_parked();
     in_frame(cx, handle, |window, _| {
-        assert_eq!(appearance_dropdown(window, 2).as_deref(), Some("14"))
+        assert_eq!(appearance_dropdown(window, 2).as_deref(), Some("18"))
     });
-    cx.update(|cx| assert_eq!(cx.theme().font_size.as_f32(), 14.));
+    cx.update(|cx| assert_eq!(cx.theme().font_size.as_f32(), 18.));
 }
 
 /// 设置 › SFTP › 传输: 最大同时传输数量 shows three, marked as the default,

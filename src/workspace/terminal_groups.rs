@@ -1,21 +1,16 @@
 //! 命令广播. Dock owns tab dragging. The workspace owns the explicitly
-//! checked, live connections that share input, the command bar above them
-//! and the split layout they are arranged in; reconnects never inherit
+//! checked, live connections that share input and the split layout they are
+//! arranged in; 撰写窗格 is their command bar. Reconnects never inherit
 //! membership.
 
+use gpui_kit::component::Placement;
 use gpui_kit::component::dock::{DockArea, DockPlacement, InsertTarget, PaneRef, PanelId};
-use gpui_kit::component::notification::Notification;
-use gpui_kit::component::{Placement, WindowExt as _};
 use gpui_kit::*;
 
 use super::Workspace;
-use crate::app::{
-    BroadcastSnippet, CenterTab, InterruptBroadcast, SendBroadcastCommand, SetBroadcastTarget,
-    ToggleBroadcastKeys, ToggleTerminalBroadcast,
-};
-use crate::i18n::{join_list, t};
+use crate::app::{CenterTab, SetBroadcastTarget, ToggleBroadcastKeys, ToggleTerminalBroadcast};
 use crate::shared::RenamableTab as _;
-use crate::terminal::{BroadcastSelection, TerminalInput, TerminalInputEvent, TerminalView};
+use crate::terminal::{BroadcastSelection, TerminalInputEvent, TerminalView};
 
 #[derive(Default)]
 pub(super) struct TerminalBroadcast {
@@ -23,8 +18,7 @@ pub(super) struct TerminalBroadcast {
     /// In the order checked, which is the order of the split layout.
     selected: Vec<(CenterTab, u64)>,
     /// Typing in one checked terminal goes to the others as well. Off, only
-    /// the command bar broadcasts, so a password typed at one prompt stays
-    /// there.
+    /// 撰写窗格 broadcasts, so a password typed at one prompt stays there.
     keys: bool,
 }
 
@@ -33,16 +27,24 @@ impl TerminalBroadcast {
         self.selected.retain(|target| available.contains(target));
     }
 
-    /// At least two terminals checked: the command bar is up.
-    fn active(&self) -> bool {
+    /// At least two terminals checked: 撰写窗格 sends to them.
+    pub(super) fn active(&self) -> bool {
         self.enabled && self.selected.len() >= 2
+    }
+
+    pub(super) fn count(&self) -> usize {
+        self.selected.len()
+    }
+
+    pub(super) fn keys(&self) -> bool {
+        self.keys
     }
 }
 
-/// A checked terminal, as the command bar sends to it.
-struct Recipient {
-    view: Entity<TerminalView>,
-    name: SharedString,
+/// A terminal as 撰写窗格 sends to it.
+pub(super) struct Recipient {
+    pub(super) view: Entity<TerminalView>,
+    pub(super) name: SharedString,
 }
 
 /// How many columns `count` terminals are laid out in: about a square.
@@ -84,27 +86,32 @@ impl Workspace {
             .collect()
     }
 
-    fn broadcast_recipients(&self, cx: &App) -> Vec<Recipient> {
+    /// A terminal tab, by its view and the name its tab shows.
+    pub(super) fn recipient(&self, tab: CenterTab, cx: &App) -> Option<Recipient> {
+        match tab {
+            CenterTab::Terminal(id) => {
+                let panel = self.terminals.get(&id)?.read(cx);
+                Some(Recipient {
+                    view: panel.terminal().clone(),
+                    name: panel.tab_title(cx),
+                })
+            }
+            CenterTab::LocalTerminal(id) => {
+                let panel = self.local_terminals.get(&id)?.read(cx);
+                Some(Recipient {
+                    view: panel.terminal().clone(),
+                    name: panel.display_title(cx),
+                })
+            }
+            _ => None,
+        }
+    }
+
+    pub(super) fn broadcast_recipients(&self, cx: &App) -> Vec<Recipient> {
         self.broadcast
             .selected
             .iter()
-            .filter_map(|(tab, _)| match tab {
-                CenterTab::Terminal(id) => {
-                    let panel = self.terminals.get(id)?.read(cx);
-                    Some(Recipient {
-                        view: panel.terminal().clone(),
-                        name: panel.tab_title(cx),
-                    })
-                }
-                CenterTab::LocalTerminal(id) => {
-                    let panel = self.local_terminals.get(id)?.read(cx);
-                    Some(Recipient {
-                        view: panel.terminal().clone(),
-                        name: panel.display_title(cx),
-                    })
-                }
-                _ => None,
-            })
+            .filter_map(|(tab, _)| self.recipient(*tab, cx))
             .collect()
     }
 
@@ -134,18 +141,21 @@ impl Workspace {
         }
         let area = self.dock_area.read(cx);
         let mut first = None;
+        let mut groups = Vec::new();
         if let Some(tree) = area.layout(DockPlacement::Center) {
             tree.root().walk(&mut |node| {
-                if first.is_none()
-                    && matches!(node.kind(), PaneRef::Tabs { .. })
-                    && area.zoomed_group().is_none_or(|zoomed| zoomed == node.id())
-                {
+                if !matches!(node.kind(), PaneRef::Tabs { .. }) {
+                    return;
+                }
+                groups.push(node.id());
+                if first.is_none() && area.zoomed_group().is_none_or(|zoomed| zoomed == node.id()) {
                     first = Some(node.id());
                 }
             });
         }
         let hosts_open = (!area.is_zoomed() && area.is_dock_collapsible(DockPlacement::Left))
             .then(|| area.is_dock_open(DockPlacement::Left));
+        self.skin.set_center_groups(groups, cx);
         self.skin.set_broadcast(
             first,
             hosts_open,
@@ -153,10 +163,6 @@ impl Workspace {
             self.broadcast.selected.len(),
             cx,
         );
-        self.skin.set_command_bar_shown(self.broadcast.active(), cx);
-        let keys = self.broadcast.keys;
-        self.broadcast_bar
-            .update(cx, |bar, cx| bar.set_keys(keys, cx));
     }
 
     /// What was typed in one terminal, to the other checked ones when the
@@ -193,49 +199,6 @@ impl Workspace {
                 view.receive_input(event.input(), cx);
             });
         }
-    }
-
-    /// Put `command` on the input line of every checked terminal and with
-    /// `run` run it. After whatever is typed there, not in its place as
-    /// 命令片段 does for one: as Xshell's and SecureCRT's send to all, and
-    /// clearing with Ctrl-E Ctrl-U rings bash's bell on an empty line and
-    /// means other things to network devices. Says which terminals could not
-    /// take it, and returns whether any did.
-    fn broadcast_command(
-        &mut self,
-        command: &str,
-        run: bool,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> bool {
-        self.sync_broadcast(cx);
-        if !self.broadcast.active() {
-            return false;
-        }
-        let mut sent = false;
-        // Why not, with the terminals it applies to, in the order met.
-        let mut refused: Vec<(SharedString, Vec<SharedString>)> = Vec::new();
-        for recipient in self.broadcast_recipients(cx) {
-            match recipient
-                .view
-                .update(cx, |view, cx| view.enter_command(command, run, false, cx))
-            {
-                Ok(()) => sent = true,
-                Err(why) => match refused.iter_mut().find(|(reason, _)| *reason == why) {
-                    Some((_, names)) => names.push(recipient.name),
-                    None => refused.push((why, vec![recipient.name])),
-                },
-            }
-        }
-        for (why, names) in refused {
-            let message = t!(
-                "workspace.broadcast.refused",
-                names = join_list(&names),
-                error = why
-            );
-            window.push_notification(Notification::error(message), cx);
-        }
-        sent
     }
 
     /// Lay the checked terminals out side by side, in the order checked, in
@@ -330,6 +293,7 @@ impl Workspace {
             ..TerminalBroadcast::default()
         };
         self.sync_broadcast(cx);
+        self.sync_compose(window, cx);
         self.focus_center(window, cx);
         cx.notify();
     }
@@ -361,72 +325,25 @@ impl Workspace {
         if added && self.broadcast.active() {
             self.arrange_broadcast(window, cx);
         }
+        self.sync_compose(window, cx);
         if self.broadcast.active() && !was_active {
-            // The bar has just come up: type the command there. A tab the
-            // dock moved takes the focus as it becomes active, which its
-            // group tells it from a spawned task; this one comes after.
-            let bar = self.broadcast_bar.clone();
-            cx.spawn_in(window, async move |_, cx| {
-                _ = cx.update(|window, cx| bar.update(cx, |bar, cx| bar.focus(window, cx)));
-            })
-            .detach();
+            // 撰写窗格 now sends to them all: type the command there.
+            self.focus_compose_soon(window, cx);
         } else {
             self.focus_center(window, cx);
         }
         cx.notify();
     }
 
-    pub(super) fn on_send_broadcast_command(
-        &mut self,
-        _: &SendBroadcastCommand,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        let command = self.broadcast_bar.read(cx).command(cx);
-        // What could not be sent anywhere stays, to send again.
-        if self.broadcast_command(&command, true, window, cx) {
-            self.broadcast_bar
-                .update(cx, |bar, cx| bar.clear(window, cx));
-        }
-    }
-
-    pub(super) fn on_broadcast_snippet(
-        &mut self,
-        action: &BroadcastSnippet,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        let Some(snippet) = self.store.read(cx).snippet(action.0).cloned() else {
-            return;
-        };
-        self.broadcast_command(&snippet.command, snippet.run_on_click, window, cx);
-    }
-
-    pub(super) fn on_interrupt_broadcast(
-        &mut self,
-        _: &InterruptBroadcast,
-        _: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        self.sync_broadcast(cx);
-        if !self.broadcast.active() {
-            return;
-        }
-        for recipient in self.broadcast_recipients(cx) {
-            recipient.view.update(cx, |view, cx| {
-                view.receive_input(&TerminalInput::Bytes(vec![0x03]), cx);
-            });
-        }
-    }
-
     pub(super) fn on_toggle_broadcast_keys(
         &mut self,
         _: &ToggleBroadcastKeys,
-        _: &mut Window,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) {
         self.broadcast.keys = !self.broadcast.keys;
         self.sync_broadcast(cx);
+        self.sync_compose(window, cx);
     }
 }
 

@@ -15,38 +15,50 @@ workspace.broadcast.target:
 workspace.broadcast.unavailable:
   zh-CN: 终端连接后可加入命令广播
   en: Connect this terminal to include it in input broadcast
-# The command bar above the checked terminals.
-workspace.broadcast.placeholder:
-  zh-CN: 输入命令，回车发送到勾选的终端
-  en: Type a command. Enter runs it in the checked terminals
-workspace.broadcast.snippets:
-  zh-CN: 片段
-  en: Snippets
-workspace.broadcast.snippets_tooltip:
-  zh-CN: 把命令片段发送到勾选的终端
-  en: Send a snippet to the checked terminals
-workspace.broadcast.no_snippets:
-  zh-CN: 还没有命令片段
-  en: No snippets yet
-workspace.broadcast.keys:
-  zh-CN: 同步按键
-  en: Sync keys
-workspace.broadcast.keys_tooltip:
-  zh-CN: 在任一勾选的终端里打字时，同时发给其他勾选的终端
-  en: Typing in one checked terminal goes to the others too
-workspace.broadcast.send:
-  zh-CN: 发送到全部
-  en: Send to all
-workspace.broadcast.send_tooltip:
-  zh-CN: 在勾选的终端里执行这一行（回车）
-  en: Run this line in the checked terminals (Enter)
-workspace.broadcast.interrupt:
-  zh-CN: 向勾选的终端发送 Ctrl+C
-  en: Send Ctrl+C to the checked terminals
 workspace.broadcast.end:
   zh-CN: 结束命令广播
   en: Stop broadcasting
-workspace.broadcast.refused:
+# 撰写窗格 below the terminals, the broadcast's command bar while it is on.
+workspace.compose.title:
+  zh-CN: 撰写窗格
+  en: Compose
+workspace.compose.broadcast_target:
+  zh-CN: "勾选的 %{count} 个终端"
+  en: "%{count} checked terminals"
+workspace.compose.placeholder:
+  zh-CN: 输入命令，回车执行，Shift+Enter 换行
+  en: Type commands. Enter runs them, Shift+Enter starts a new line
+workspace.compose.snippets:
+  zh-CN: 片段
+  en: Snippets
+workspace.compose.snippets_tooltip:
+  zh-CN: 发送一条命令片段
+  en: Send a snippet
+workspace.compose.no_snippets:
+  zh-CN: 还没有命令片段
+  en: No snippets yet
+workspace.compose.keys:
+  zh-CN: 同步按键
+  en: Sync keys
+workspace.compose.keys_tooltip:
+  zh-CN: 在任一勾选的终端里打字时，同时发给其他勾选的终端
+  en: Typing in one checked terminal goes to the others too
+workspace.compose.send:
+  zh-CN: 发送
+  en: Send
+workspace.compose.send_all:
+  zh-CN: 发送到全部
+  en: Send to all
+workspace.compose.send_tooltip:
+  zh-CN: 执行撰写的命令（回车）
+  en: Run the commands (Enter)
+workspace.compose.interrupt:
+  zh-CN: 发送 Ctrl+C
+  en: Send Ctrl+C
+workspace.compose.close:
+  zh-CN: 关闭撰写窗格
+  en: Close compose pane
+workspace.compose.refused:
   zh-CN: "没有发送到 %{names}：%{error}"
   en: "Not sent to %{names}: %{error}"
 
@@ -326,3 +338,63 @@ workspace.zmodem.files_only:
 workspace.projects.kept_output:
   zh-CN: 以上是上次关闭时的内容
   en: Above is what this terminal showed when it last closed
+
+# 同步: setting it up, what it waits for the user to settle.
+workspace.sync.choose_folder:
+  zh-CN: 选择同步文件夹
+  en: Choose the sync folder
+workspace.sync.folder_failed:
+  zh-CN: 无法在这个文件夹里同步
+  en: Can’t sync through this folder
+workspace.sync.title:
+  zh-CN: 同步
+  en: Sync
+workspace.sync.review:
+  zh-CN: 处理…
+  en: Review…
+workspace.sync.needs_password:
+  zh-CN: 同步密码已在别的设备上更改，输入新密码后继续同步。
+  en: The sync password was changed on another device. Enter the new one to keep syncing.
+workspace.sync.vault_replaced:
+  zh-CN: 同步已在别的设备上重置，重新加入后继续同步。
+  en: Sync was reset on another device. Rejoin it to keep syncing.
+workspace.sync.login_refused:
+  zh-CN: 同步的位置拒绝了这台电脑的登录信息，重新登录后继续同步。
+  en: The sync location refused this computer’s login. Sign in again to keep syncing.
+workspace.sync.removed_notice:
+  zh-CN: 这台电脑已在别的设备上被移出同步，同步已暂停。
+  en: This computer was removed from sync on another device. Sync is paused.
+workspace.sync.mass_delete_notice.one:
+  en: This sync would delete %{count} record. It waits for you to agree.
+workspace.sync.mass_delete_notice.other:
+  zh-CN: 这次同步会删除 %{count} 条记录，等你确认。
+  en: This sync would delete %{count} records. It waits for you to agree.
+workspace.sync.removed_title:
+  zh-CN: 重新加入同步？
+  en: Rejoin sync?
+workspace.sync.removed:
+  zh-CN: 另一台设备把这台电脑移出了同步。重新加入会把这台电脑的数据再写回同步文件夹。
+  en: Another device removed this computer from sync. Rejoining writes this computer’s data back to the sync folder.
+workspace.sync.rejoin:
+  zh-CN: 重新加入
+  en: Rejoin
+workspace.sync.mass_delete_title.one:
+  en: Delete %{count} record everywhere?
+workspace.sync.mass_delete_title.other:
+  zh-CN: 在所有设备上删除 %{count} 条记录？
+  en: Delete %{count} records everywhere?
+workspace.sync.mass_delete:
+  zh-CN: 共 %{of} 条记录。如果不是你删的，选「取消」，同步会暂停，直到你确认。
+  en: "%{of} records in all. If you didn’t delete them, cancel: sync waits until you agree."
+workspace.sync.remove_title:
+  zh-CN: 移除“%{name}”？
+  en: Remove “%{name}”?
+workspace.sync.remove:
+  zh-CN: 它在同步文件夹里的文件会被删除。如果设备丢失了，接着更换同步密码。
+  en: Its file in the sync folder is deleted. If the device is lost, change the sync password next.
+workspace.sync.remove_device:
+  zh-CN: 移除
+  en: Remove
+workspace.sync.remove_failed:
+  zh-CN: 设备未能移除
+  en: Couldn’t remove the device

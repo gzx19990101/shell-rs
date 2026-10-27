@@ -1,15 +1,19 @@
-use std::{cell::Cell, rc::Rc, sync::Arc};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+    sync::Arc,
+};
 
 use crate::app::{CatalogIcon, ToggleHostPanel, ToggleTerminalBroadcast};
 use crate::i18n::t;
 use gpui_kit::component::dock::{
     BasePanelView, DockArea, DockAreaRenderer, DockContext, DockSkin, DropIndicator, NodeId,
-    PanelState, TabGroupContext, TabGroupRenderer, TilesRenderer,
+    PanelState, PanelStyle, TabGroupContext, TabGroupRenderer, TilesRenderer,
 };
 use gpui_kit::component::{
     ActiveTheme as _, Icon, IconName, Selectable as _, Sizable as _,
     button::{Button, ButtonVariants as _},
-    h_flex,
+    h_flex, v_flex,
 };
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -26,7 +30,7 @@ struct TabBarControls {
 }
 
 impl TabBarControls {
-    fn controls(self, target: &FocusHandle) -> impl IntoElement {
+    fn controls(self, target: &FocusHandle, cx: &App) -> impl IntoElement {
         let hosts = target.clone();
         let broadcast = target.clone();
         let label = if !self.enabled {
@@ -36,10 +40,19 @@ impl TabBarControls {
         } else {
             t!("workspace.broadcast.active", count = self.count)
         };
+        // Bordered like the tab bar's own prefix: the bar's bottom line runs
+        // under it, and the first tab, drawn without a left border, is set
+        // off from it.
         h_flex()
+            .id("tab-bar-controls")
+            .test_support()
             .flex_shrink_0()
-            .pl_2()
+            .self_stretch()
+            .px_2()
             .gap_1()
+            .border_b_1()
+            .border_r_1()
+            .border_color(cx.theme().border)
             .when_some(self.hosts_open, |row, open| {
                 row.child(
                     Button::new("toggle-dock:Left")
@@ -76,8 +89,7 @@ impl TabBarControls {
 }
 
 /// The workspace's dock appearance: gpui-kit's `DockSkin`, plus a view that
-/// fills the center while it holds no tab, and 命令广播's command bar above
-/// the center's tab groups while terminals are checked.
+/// fills the center while it holds no tab.
 ///
 /// The dock draws nothing for an empty center and `DockAreaRenderer` has no
 /// empty-center hook, so the placeholder rides on `center_frame`. It is drawn
@@ -86,28 +98,29 @@ impl TabBarControls {
 /// workspace keeps that in step with `DockEvent::LayoutChanged`.
 pub(super) struct WorkspaceDockSkin {
     skin: Rc<DockSkin>,
-    // Only the leading center bar replaces the built-in sidebar toggle, so
-    // its two controls can sit together. Other dock bars keep their skin.
+    // The center's bars: always tabs, so a lone tab looks selected as it
+    // does among others, while the sidebars keep their plain title. The
+    // leading one replaces the built-in sidebar toggle, so its two
+    // controls can sit together; no other center bar shows a toggle.
     center_skin: Rc<DockSkin>,
+    /// The center's tab groups, which the workspace keeps in step with the
+    /// layout (`set_center_groups`).
+    center_groups: Rc<RefCell<Vec<NodeId>>>,
     broadcast: Rc<Cell<TabBarControls>>,
     target: FocusHandle,
     area: WeakEntity<DockArea>,
     placeholder: AnyView,
     center_empty: Cell<bool>,
-    command_bar: AnyView,
-    command_bar_shown: Cell<bool>,
 }
 
 impl WorkspaceDockSkin {
     /// Build a `DockArea` wearing this skin, together with the handle its
     /// settings are changed through. `placeholder` is what the center shows
-    /// while it is empty, `command_bar` what it shows above its tab groups
-    /// while 命令广播 has terminals checked.
+    /// while it is empty.
     pub(super) fn dock_area(
         id: &'static str,
         version: Option<usize>,
         placeholder: AnyView,
-        command_bar: AnyView,
         target: FocusHandle,
         window: &mut Window,
         cx: &mut App,
@@ -117,13 +130,12 @@ impl WorkspaceDockSkin {
             let this = Rc::new(Self {
                 skin: DockSkin::new(cx),
                 center_skin: DockSkin::new(cx),
+                center_groups: Rc::default(),
                 broadcast: Rc::default(),
                 target,
                 area: cx.weak_entity(),
                 placeholder,
                 center_empty: Cell::new(false),
-                command_bar,
-                command_bar_shown: Cell::new(false),
             });
             skin = Some(this.clone());
             DockArea::new(id, version, window, cx).with_renderer(this)
@@ -131,6 +143,7 @@ impl WorkspaceDockSkin {
         // The closure above runs before `cx.new` returns.
         let skin = skin.expect("the skin is built inside the constructor");
         skin.center_skin.set_toggle_button_visible(false, cx);
+        skin.center_skin.set_panel_style(PanelStyle::TabBar, cx);
         (area, skin)
     }
 
@@ -157,9 +170,9 @@ impl WorkspaceDockSkin {
         }
     }
 
-    /// Show (`true`) or hide 命令广播's command bar.
-    pub(super) fn set_command_bar_shown(&self, shown: bool, cx: &mut App) {
-        if self.command_bar_shown.replace(shown) != shown {
+    pub(super) fn set_center_groups(&self, groups: Vec<NodeId>, cx: &mut App) {
+        if *self.center_groups.borrow() != groups {
+            self.center_groups.replace(groups);
             _ = self.area.update(cx, |_, cx| cx.notify());
         }
     }
@@ -192,12 +205,6 @@ impl DockAreaRenderer for WorkspaceDockSkin {
         self.skin
             .center_frame(window, cx)
             .relative()
-            // The dock puts the center's tab groups after what the frame
-            // holds, in a column: the bar sits above all of them.
-            .when(
-                self.command_bar_shown.get() && !self.center_empty.get(),
-                |frame| frame.child(self.command_bar.clone()),
-            )
             .when(self.center_empty.get(), |frame| {
                 // Deferred, so it paints after the empty layout's own
                 // background, which the dock draws later in the same frame.
@@ -230,6 +237,7 @@ impl DockAreaRenderer for WorkspaceDockSkin {
         Rc::new(WorkspaceTabBar {
             skin: self.skin.tab_group_renderer(),
             center_skin: self.center_skin.tab_group_renderer(),
+            center_groups: self.center_groups.clone(),
             broadcast: self.broadcast.clone(),
             target: self.target.clone(),
         })
@@ -240,11 +248,41 @@ impl DockAreaRenderer for WorkspaceDockSkin {
     }
 }
 
+/// A center tab bar, in a column as base lays the bars out, that a mouse
+/// wheel scrolls sideways (#66).
+///
+/// The bar scrolls only along itself, dropping vertical deltas, while a
+/// mouse wheel turns only vertically: tabs scrolled out of view could be
+/// reached only with Shift held. A vertical turn is sent again as the
+/// sideways one Shift makes. Only a wheel's, which comes in lines; a
+/// trackpad swipes sideways itself.
+fn wheel_scrolls_tabs(tabs: AnyElement) -> Div {
+    v_flex()
+        .on_scroll_wheel(|event, window, cx| {
+            let ScrollDelta::Lines(lines) = event.delta else {
+                return;
+            };
+            if lines.x != 0. || lines.y == 0. {
+                return;
+            }
+            cx.stop_propagation();
+            let sideways = ScrollWheelEvent {
+                delta: ScrollDelta::Lines(point(lines.y, 0.)),
+                ..event.clone()
+            };
+            window.defer(cx, move |window, cx| {
+                window.dispatch_event(sideways.to_platform_input(), cx);
+            });
+        })
+        .child(tabs)
+}
+
 /// Add the permanent broadcast toggle ahead of the leading center tab strip.
 /// Dock's renderer still owns tabs, dragging, overflow, menus and focus.
 struct WorkspaceTabBar {
     skin: Rc<dyn TabGroupRenderer>,
     center_skin: Rc<dyn TabGroupRenderer>,
+    center_groups: Rc<RefCell<Vec<NodeId>>>,
     broadcast: Rc<Cell<TabBarControls>>,
     target: FocusHandle,
 }
@@ -267,16 +305,37 @@ impl TabGroupRenderer for WorkspaceTabBar {
         window: &mut Window,
         cx: &mut App,
     ) -> AnyElement {
+        // 撰写窗格 draws its own title bar.
+        if let [panel] = group.panels()
+            && panel.panel_name(cx) == "ComposePane"
+        {
+            return Empty.into_any_element();
+        }
         let state = self.broadcast.get();
         if state.node != Some(group.node()) {
-            return self.skin.render_tab_bar(group, window, cx);
+            return if self.center_groups.borrow().contains(&group.node()) {
+                wheel_scrolls_tabs(self.center_skin.render_tab_bar(group, window, cx))
+                    .into_any_element()
+            } else {
+                self.skin.render_tab_bar(group, window, cx)
+            };
         }
         let tabs = self.center_skin.render_tab_bar(group, window, cx);
         h_flex()
             .w_full()
             .bg(cx.theme().tokens.tab_bar)
-            .child(state.controls(&self.target))
-            .child(div().flex_1().min_w_0().child(tabs))
+            .child(state.controls(&self.target, cx))
+            // A column, as base lays out the other bars: in a block `div`
+            // the bar's height is indefinite, so the toolbar box on its
+            // right, `h_full`, shrinks to its buttons and its bottom border
+            // sits above the bar's (#44).
+            .child(
+                wheel_scrolls_tabs(tabs)
+                    .id("center-tab-bar")
+                    .test_support()
+                    .flex_1()
+                    .min_w_0(),
+            )
             .into_any_element()
     }
     fn render_active_panel(

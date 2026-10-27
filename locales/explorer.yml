@@ -444,8 +444,8 @@ explorer.browse:
   zh-CN: 浏览…
   en: Browse…
 explorer.choose_upload:
-  zh-CN: 选择要上传的文件或目录
-  en: Choose files or folders to upload
+  zh-CN: 上传
+  en: Upload
 
 explorer.tab.open_sftp_tip:
   zh-CN: 打开 SFTP 文件浏览

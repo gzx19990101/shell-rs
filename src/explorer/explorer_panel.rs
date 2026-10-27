@@ -883,9 +883,12 @@ impl ExplorerPanel {
                 if self.state != ConnectionState::Connected {
                     return;
                 }
+                // Windows and Linux dialogs pick files or folders, never
+                // both, and asking for folders hides the files (#60); there
+                // folders upload by dragging them in.
                 let choice = cx.prompt_for_paths(PathPromptOptions {
                     files: true,
-                    directories: true,
+                    directories: cx.can_select_mixed_files_and_dirs(),
                     multiple: true,
                     prompt: Some(t!("explorer.choose_upload")),
                 });

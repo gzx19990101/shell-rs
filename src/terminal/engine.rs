@@ -991,6 +991,17 @@ impl TerminalRuntime {
                             parser.proxy.send(TerminalUiEventKind::Started);
                         }
                         TerminalTransportEvent::Output(bytes) => {
+                            // Files dropped on the terminal come as a control
+                            // sent before the `rz` typed for them, but its
+                            // answer may be here with the control still
+                            // waiting: `receive` takes the output first
+                            // whenever both have come, as a busy thread finds
+                            // them. The controls are read first, so the files
+                            // are there when the header is.
+                            while let Ok(control) = zmodem_controls.try_recv() {
+                                let fed = parser.zmodem.control(control, Instant::now());
+                                parser.transfer(fed);
+                            }
                             // `exec --terminal` reads the output for its
                             // markers: no transfer starts under it.
                             let detect = !lock_run(&parser.run)

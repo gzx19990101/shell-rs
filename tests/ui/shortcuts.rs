@@ -268,31 +268,34 @@ fn the_zoom_keys_size_a_terminals_text_and_the_interface_elsewhere(cx: &mut Test
         in_frame(cx, handle, |window, cx| window.press(&keys, cx))
     };
 
+    // 外观 › 界面字号 by default: 16, or 14 on Windows.
+    let default = DEFAULT_INTERFACE_FONT_SIZE;
+
     // In a terminal: its text, a pixel a step, kept in the settings.
     press(primary("="), cx);
-    assert_eq!((terminal_size(cx), interface_size(cx)), (14., 16.));
+    assert_eq!((terminal_size(cx), interface_size(cx)), (14., default));
     press(primary("-"), cx);
     press(primary("-"), cx);
-    assert_eq!((terminal_size(cx), interface_size(cx)), (12., 16.));
+    assert_eq!((terminal_size(cx), interface_size(cx)), (12., default));
     // No smaller than 设置 › 终端 › 字号 goes.
     for _ in 0..5 {
         press(primary("-"), cx);
     }
     assert_eq!(terminal_size(cx), 10.);
     press(primary("0"), cx);
-    assert_eq!((terminal_size(cx), interface_size(cx)), (13., 16.));
+    assert_eq!((terminal_size(cx), interface_size(cx)), (13., default));
 
     // Elsewhere, the interface: two pixels a step, kept in the settings.
     in_frame(cx, handle, |window, cx| window.click("open-settings", cx));
     press(primary("="), cx);
-    assert_eq!((terminal_size(cx), interface_size(cx)), (13., 18.));
+    assert_eq!((terminal_size(cx), interface_size(cx)), (13., default + 2.));
     // No larger than 设置 › 外观 › 界面字号 goes.
     for _ in 0..3 {
         press(primary("="), cx);
     }
     assert_eq!(interface_size(cx), 20.);
     press(primary("0"), cx);
-    assert_eq!((terminal_size(cx), interface_size(cx)), (13., 16.));
+    assert_eq!((terminal_size(cx), interface_size(cx)), (13., default));
     // The settings' own one pixel steps, which the keys step on from.
     let settings = cx.update(|cx| workspace.read(cx).settings().clone());
     cx.update(|cx| {

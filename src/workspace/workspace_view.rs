@@ -69,6 +69,7 @@ use crate::sftp::{
     SystemLocalDirectoryProvider, TransferDirection,
 };
 use crate::shared::{commit_footer, confirm_danger, open_rename_tab_dialog};
+use crate::sync::{SyncEvent, SyncService, SyncServices};
 use crate::terminal::{
     DEFAULT_FONT_SIZE, HostTerminalTransports, LocalPtyTransportProvider, LocalTerminalId,
     LocalTerminalPanel, LocalTerminalPanelEvent, RemoteTerminalId, SavedName, SearchDirection,
@@ -79,7 +80,8 @@ use crate::terminal::{
 use crate::update::{UpdateServices, Updater, UpdaterEvent};
 
 use super::{
-    broadcast_bar::BroadcastBar,
+    compose::COMPOSE_HEIGHT,
+    compose_pane::ComposePane,
     dock_skin::WorkspaceDockSkin,
     recent_hosts::RecentHosts,
     sidebar::Sidebar,
@@ -149,8 +151,10 @@ pub(super) enum PromptOwner {
 /// panels, and handles every application action.
 pub struct Workspace {
     pub(super) broadcast: super::terminal_groups::TerminalBroadcast,
-    /// 命令广播's command bar, shown by the dock skin above the terminals.
-    pub(super) broadcast_bar: Entity<BroadcastBar>,
+    /// 撰写窗格, in the bottom dock while it shows.
+    pub(super) compose: Entity<ComposePane>,
+    /// How tall 撰写窗格 was last: it opens again so.
+    pub(super) compose_height: Pixels,
     pub(super) store: Entity<HostStore>,
     pub(super) dock_area: Entity<DockArea>,
     pub(super) skin: Rc<WorkspaceDockSkin>,
@@ -194,6 +198,9 @@ pub struct Workspace {
     /// in UI tests, so it never reaches the network unless a test hands it
     /// fakes.
     pub(super) updater: Entity<Updater>,
+    /// 同步. Without services in UI tests, so it never reaches a folder
+    /// unless a test hands it a store.
+    pub(super) sync: Entity<SyncService>,
     /// 匿名使用统计. Production only, like the CLI server: UI tests hand in
     /// one that only records.
     pub(super) analytics: Option<super::analytics::Reporting>,
@@ -307,6 +314,8 @@ impl Workspace {
             updater.set_services(UpdateServices::system(bundle), cx);
             updater.start(cx);
         });
+        this.sync
+            .update(cx, |sync, cx| sync.set_services(SyncServices::system(), cx));
         if let Some(services) = AnalyticsServices::system() {
             let enabled = this.settings.read(cx).settings().analytics.enabled;
             this.set_analytics(Analytics::start(services, enabled), window, cx);
@@ -350,13 +359,12 @@ impl Workspace {
             serial: serial_terminal_provider,
         };
         let recent = cx.new(|cx| RecentHosts::new(store.clone(), focus_handle.clone(), cx));
-        let broadcast_bar =
-            cx.new(|cx| BroadcastBar::new(store.clone(), focus_handle.clone(), window, cx));
+        let compose =
+            cx.new(|cx| ComposePane::new(store.clone(), focus_handle.clone(), window, cx));
         let (dock_area, skin) = WorkspaceDockSkin::dock_area(
             DOCK_ID,
             Some(DOCK_VERSION),
             recent.clone().into(),
-            broadcast_bar.clone().into(),
             focus_handle.clone(),
             window,
             cx,
@@ -369,6 +377,12 @@ impl Workspace {
             updater.set_automatic(update_settings.automatic, cx);
             updater.set_channel(update_settings.channel, cx);
             updater
+        });
+        let sync_location = settings.read(cx).settings().sync.location.clone();
+        let sync = cx.new(|cx| {
+            let mut sync = SyncService::new(store.clone(), cx);
+            sync.set_location(sync_location, cx);
+            sync
         });
         let forward_panel = cx.new(|cx| {
             ForwardPanel::new(
@@ -397,9 +411,11 @@ impl Workspace {
             // workspace goes with its window, as ShellRS quits (and on
             // Windows and Linux as the window closes, before it quits).
             cx.on_release(|this, cx| this.keep_on_close(cx)),
-            // The right sidebar is never dragged narrower than it opens.
+            // The right sidebar is never dragged narrower than it opens, nor
+            // 撰写窗格 lower than a line or two.
             cx.observe_in(&dock_area, window, |this, _, window, cx| {
-                this.hold_tool_sidebar_width(window, cx)
+                this.hold_tool_sidebar_width(window, cx);
+                this.hold_compose_height(window, cx);
             }),
             cx.observe_in(&store, window, |this, _, window, cx| {
                 this.sync_cli_server(cx);
@@ -433,6 +449,7 @@ impl Workspace {
                 }
                 this.sync_cli_server(cx);
                 this.sync_updater(cx);
+                this.follow_sync_settings(cx);
                 this.sync_analytics(window, cx);
                 if !settings
                     .read(cx)
@@ -452,6 +469,15 @@ impl Workspace {
                     this.on_updater_event(event, window, cx)
                 },
             ),
+            cx.subscribe_in(&sync, window, |this, _, event: &SyncEvent, window, cx| {
+                this.on_sync_event(event, window, cx)
+            }),
+            // Coming back to ShellRS, the other computers' edits come too.
+            cx.observe_window_activation(window, |this, window, cx| {
+                if window.is_window_active() {
+                    this.sync.update(cx, |sync, cx| sync.window_activated(cx));
+                }
+            }),
             cx.subscribe_in(
                 &settings,
                 window,
@@ -616,6 +642,7 @@ impl Workspace {
             cli_integration: cx.new(|_| CliIntegration::new(None)),
             cli_server: None,
             updater,
+            sync,
             analytics: None,
             local_terminal_provider,
             host_terminals,
@@ -627,7 +654,8 @@ impl Workspace {
             next_explorer_id: 1,
             active_tab: None,
             broadcast: Default::default(),
-            broadcast_bar,
+            compose,
+            compose_height: COMPOSE_HEIGHT,
             tool_target_choice: None,
             deleted_host_tools: HashMap::new(),
             prompt_queue: VecDeque::new(),
@@ -807,6 +835,10 @@ impl Workspace {
         &self.updater
     }
 
+    pub fn sync(&self) -> &Entity<SyncService> {
+        &self.sync
+    }
+
     /// Give the focus to the center: the tab shown last, or the start page
     /// while there is none. For when the focus is about to go off screen.
     pub(super) fn focus_center(&self, window: &mut Window, cx: &mut Context<Self>) {
@@ -865,6 +897,7 @@ impl Workspace {
         // A tab dragged into another group may hide the one in front.
         self.sync_front(window, cx);
         self.sync_broadcast(cx);
+        self.sync_compose(window, cx);
         // Tabs reordered, moved, opened or closed: what the next launch
         // opens again.
         self.sync_saved_terminals(cx);
@@ -1348,7 +1381,8 @@ impl Workspace {
         // Something may have been installed or removed since last time.
         integration.update(cx, |integration, cx| integration.refresh(cx));
         let updater = self.updater.clone();
-        let panel = cx.new(|cx| SettingsPanel::new(store, integration, updater, window, cx));
+        let sync = self.sync.clone();
+        let panel = cx.new(|cx| SettingsPanel::new(store, integration, updater, sync, window, cx));
         let subscription = cx.subscribe_in(
             &panel,
             window,
@@ -2543,6 +2577,7 @@ fn new_terminal_panel(
                 this.close_file_sidebar(*terminal_id, window, cx);
                 this.directory_follow.remove(terminal_id);
                 this.sync_broadcast(cx);
+                this.sync_compose(window, cx);
                 if this.active_tab == Some(CenterTab::Terminal(*terminal_id)) {
                     this.set_active_tab(None, window, cx);
                 }
@@ -2550,6 +2585,7 @@ fn new_terminal_panel(
             }
             TerminalPanelEvent::StatusChanged(..) => {
                 this.sync_broadcast(cx);
+                this.sync_compose(window, cx);
                 cx.notify();
             }
             TerminalPanelEvent::Connected(terminal_id, host_id) => {
@@ -2788,6 +2824,7 @@ fn new_local_terminal_panel(
                     this.front_saved_terminal = None;
                 }
                 this.sync_broadcast(cx);
+                this.sync_compose(window, cx);
                 if this.active_tab == Some(CenterTab::LocalTerminal(*id)) {
                     this.set_active_tab(None, window, cx);
                 }
@@ -2797,6 +2834,7 @@ fn new_local_terminal_panel(
             LocalTerminalPanelEvent::StatusChanged(id) => {
                 this.on_local_terminal_retitled(*id, cx);
                 this.sync_broadcast(cx);
+                this.sync_compose(window, cx);
                 cx.notify();
             }
             LocalTerminalPanelEvent::WorkingDirectory(id, folder) => {
@@ -2879,9 +2917,10 @@ impl Render for Workspace {
             .on_action(cx.listener(Self::on_new_local_terminal))
             .on_action(cx.listener(Self::on_toggle_terminal_broadcast))
             .on_action(cx.listener(Self::on_set_broadcast_target))
-            .on_action(cx.listener(Self::on_send_broadcast_command))
-            .on_action(cx.listener(Self::on_broadcast_snippet))
-            .on_action(cx.listener(Self::on_interrupt_broadcast))
+            .on_action(cx.listener(Self::on_toggle_compose_pane))
+            .on_action(cx.listener(Self::on_send_compose))
+            .on_action(cx.listener(Self::on_send_compose_snippet))
+            .on_action(cx.listener(Self::on_send_compose_interrupt))
             .on_action(cx.listener(Self::on_toggle_broadcast_keys))
             .on_action(cx.listener(Self::on_edit_host))
             .on_action(cx.listener(Self::on_duplicate_host))
@@ -2925,6 +2964,16 @@ impl Render for Workspace {
             .on_action(cx.listener(Self::on_open_download_page))
             .on_action(cx.listener(Self::on_open_changelog))
             .on_action(cx.listener(Self::on_open_website))
+            .on_action(cx.listener(Self::on_set_up_sync))
+            .on_action(cx.listener(Self::on_set_up_sync_in))
+            .on_action(cx.listener(Self::on_set_up_webdav_sync))
+            .on_action(cx.listener(Self::on_set_up_s3_sync))
+            .on_action(cx.listener(Self::on_change_sync_login))
+            .on_action(cx.listener(Self::on_sync_now))
+            .on_action(cx.listener(Self::on_review_sync))
+            .on_action(cx.listener(Self::on_change_sync_password))
+            .on_action(cx.listener(Self::on_turn_off_sync))
+            .on_action(cx.listener(Self::on_remove_sync_device))
             .on_action(cx.listener(Self::on_copy_agent_skill))
             .on_action(cx.listener(Self::on_close_settings))
             .on_action(cx.listener(Self::on_close_active_tab))

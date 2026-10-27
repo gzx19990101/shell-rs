@@ -6,7 +6,7 @@ use std::fmt;
 
 use gpui_kit::SharedString;
 
-use super::HostId;
+use super::{HostId, PublicId};
 use crate::i18n::t;
 
 /// Stable identity of a forwarding rule. Never reused within a process.
@@ -234,6 +234,11 @@ pub struct ForwardRule {
     pub auto_start: bool,
     /// Position in the forward list.
     pub sort_order: i64,
+    /// The rule's id on every device it syncs to.
+    pub sync_id: PublicId,
+    /// When the user last changed it; see [`super::Host::edited_ms`].
+    /// `auto_start` is each device's own and is not an edit.
+    pub edited_ms: u64,
 }
 
 impl ForwardRule {
@@ -247,6 +252,8 @@ impl ForwardRule {
             target: draft.target,
             auto_start: draft.auto_start,
             sort_order: 0,
+            sync_id: PublicId::generate(),
+            edited_ms: 0,
         }
     }
 

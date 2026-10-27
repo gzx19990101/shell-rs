@@ -36,7 +36,9 @@ pub use shellrs::host::{
     read_public_key,
 };
 pub use shellrs::secrets::{InMemorySecretStore, SecretRef, SecretStore as _};
-pub use shellrs::settings::{Appearance, InterfaceLanguage, SettingsStore};
+pub use shellrs::settings::{
+    Appearance, DEFAULT_INTERFACE_FONT_SIZE, InterfaceLanguage, SettingsStore,
+};
 pub use shellrs::sftp::{
     DirectoryEntry, DirectoryListing, EDIT_LIMIT, EntryKind, FileBytes, FileMetadata, FileStamp,
     LocalDirectoryProvider, ReadFailure, RemotePath, SaveFailure, SftpCommand, SftpEvent,
@@ -159,6 +161,18 @@ pub fn click_at(
     modifiers: gpui_kit::Modifiers,
     cx: &mut App,
 ) {
+    button_click_at(window, position, MouseButton::Left, modifiers, cx);
+}
+
+/// A click of any button at a point: `TestWindowExt` only clicks the left
+/// one.
+pub fn button_click_at(
+    window: &mut gpui_kit::Window,
+    position: gpui_kit::Point<gpui_kit::Pixels>,
+    button: MouseButton,
+    modifiers: gpui_kit::Modifiers,
+    cx: &mut App,
+) {
     use gpui_kit::{MouseDownEvent, MouseUpEvent};
     window.dispatch_event(
         MouseMoveEvent {
@@ -172,7 +186,7 @@ pub fn click_at(
     window.render_frame(cx);
     window.dispatch_event(
         MouseDownEvent {
-            button: MouseButton::Left,
+            button,
             position,
             modifiers,
             click_count: 1,
@@ -183,7 +197,7 @@ pub fn click_at(
     );
     window.dispatch_event(
         MouseUpEvent {
-            button: MouseButton::Left,
+            button,
             position,
             modifiers,
             click_count: 1,

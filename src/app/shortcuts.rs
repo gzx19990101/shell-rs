@@ -85,7 +85,7 @@ macro_rules! shortcut {
 }
 
 /// The shortcuts of 设置 › 键盘快捷键, in the order the page lists them.
-pub static SHORTCUTS: [Shortcut; 29] = [
+pub static SHORTCUTS: [Shortcut; 30] = [
     shortcut!(
         "new-host",
         "app.shortcut.new_host",
@@ -130,6 +130,15 @@ pub static SHORTCUTS: [Shortcut; 29] = [
         "cmd-alt-b",
         "ctrl-alt-b",
         ToggleToolSidebar
+    ),
+    shortcut!(
+        "toggle-compose-pane",
+        "app.shortcut.toggle_compose_pane",
+        General,
+        &[],
+        "cmd-shift-e",
+        "ctrl-shift-e",
+        ToggleComposePane
     ),
     // ⌘↑ and ⌘↓ go to the top and bottom of a text field, and up a folder
     // and into one in SFTP. Elsewhere Win+↑ and Win+↓ are the system's own.

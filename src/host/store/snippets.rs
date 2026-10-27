@@ -3,9 +3,9 @@
 
 use gpui_kit::{Context, SharedString};
 
-use super::{Change, HostStore};
+use super::{Change, HostStore, edited_after};
 use crate::host::{
-    Snippet, SnippetCategory, SnippetCategoryId, SnippetDraft, SnippetId, SnippetScope,
+    PublicId, Snippet, SnippetCategory, SnippetCategoryId, SnippetDraft, SnippetId, SnippetScope,
 };
 
 impl HostStore {
@@ -50,7 +50,15 @@ impl HostStore {
         let id = SnippetId(self.next_snippet_id);
         self.next_snippet_id += 1;
         let draft = self.normalized_snippet(draft);
-        self.snippets.push(Snippet::new(id, draft));
+        let mut snippet = Snippet::new(id, draft);
+        snippet.sync_id = PublicId::generate_unused(|candidate| {
+            self.snippets
+                .iter()
+                .any(|snippet| &snippet.sync_id == candidate)
+        });
+        snippet.edited_ms = edited_after(0);
+        self.snippets.push(snippet);
+        self.sync_revision += 1;
         id
     }
 
@@ -75,7 +83,12 @@ impl HostStore {
         let Some(snippet) = self.snippets.iter_mut().find(|snippet| snippet.id == id) else {
             return false;
         };
+        let sync_id = snippet.sync_id.clone();
+        let edited_ms = snippet.edited_ms;
         *snippet = Snippet::new(id, draft);
+        snippet.sync_id = sync_id;
+        snippet.edited_ms = edited_after(edited_ms);
+        self.sync_revision += 1;
         true
     }
 
@@ -91,7 +104,11 @@ impl HostStore {
     pub fn remove_snippet_unnotified(&mut self, id: SnippetId) -> bool {
         let before = self.snippets.len();
         self.snippets.retain(|snippet| snippet.id != id);
-        self.snippets.len() != before
+        if self.snippets.len() == before {
+            return false;
+        }
+        self.sync_revision += 1;
+        true
     }
 
     pub fn insert_snippet_category(
@@ -115,10 +132,15 @@ impl HostStore {
     ) -> SnippetCategoryId {
         let id = SnippetCategoryId(self.next_snippet_category_id);
         self.next_snippet_category_id += 1;
-        self.snippet_categories.push(SnippetCategory {
-            id,
-            name: name.into(),
+        let mut category = SnippetCategory::new(id, name);
+        category.sync_id = PublicId::generate_unused(|candidate| {
+            self.snippet_categories
+                .iter()
+                .any(|category| &category.sync_id == candidate)
         });
+        category.edited_ms = edited_after(0);
+        self.snippet_categories.push(category);
+        self.sync_revision += 1;
         id
     }
 
@@ -153,6 +175,8 @@ impl HostStore {
             return false;
         };
         category.name = name.into();
+        category.edited_ms = edited_after(category.edited_ms);
+        self.sync_revision += 1;
         true
     }
 
@@ -180,6 +204,7 @@ impl HostStore {
             return false;
         }
         self.snippets.retain(|snippet| snippet.category != Some(id));
+        self.sync_revision += 1;
         true
     }
 
@@ -293,10 +318,7 @@ mod tests {
             ))
             .unwrap();
         database
-            .insert_snippet_category(&SnippetCategory {
-                id: SnippetCategoryId(3),
-                name: "Docker".into(),
-            })
+            .insert_snippet_category(&SnippetCategory::new(SnippetCategoryId(3), "Docker"))
             .unwrap();
         database
             .insert_snippet(&Snippet::new(

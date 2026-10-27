@@ -577,6 +577,62 @@ async fn a_generated_key_shows_its_public_half_and_is_kept_by_shellrs(cx: &mut T
     });
 }
 
+/// What syncs is the keys ShellRS keeps, so a key file picked is copied
+/// among them; the user's own file is left as it was.
+#[gpui_kit::test]
+async fn a_key_file_picked_is_copied_among_the_keys_shellrs_keeps(cx: &mut TestAppContext) {
+    let data = tempfile::tempdir().unwrap();
+    let mine = data.path().join("id_mine");
+    let text = "-----BEGIN OPENSSH PRIVATE KEY-----\nmine\n-----END OPENSSH PRIVATE KEY-----\n";
+    std::fs::write(&mine, text).unwrap();
+    let secrets = Arc::new(InMemorySecretStore::default());
+    let (handle, workspace) = open_workspace_with_credentials(
+        cx,
+        store_keeping_keys(data.path(), secrets.clone()),
+        Arc::new(RecordingRemoteProvider::default()),
+        Arc::new(FakeConnectionTester::default()),
+    );
+    show_credentials(cx, handle).await;
+    in_frame(cx, handle, |window, cx| window.click("new-credential", cx));
+    in_frame(cx, handle, |window, cx| {
+        window.input("个人", cx);
+        window.within("credential-kind").click(1usize, cx);
+    });
+    in_frame(cx, handle, |window, cx| {
+        window.click("choose-credential-key", cx)
+    });
+    let picked = mine.clone();
+    cx.simulate_path_prompt_response(move |_| Some(vec![picked]));
+    cx.run_until_parked();
+    in_frame(cx, handle, |window, cx| {
+        window.click("credential-passphrase", cx);
+        window.input("correct horse", cx);
+        window.click("commit", cx);
+    });
+    wait_for_dialog_to_close(cx, handle).await;
+    cx.run_until_parked();
+
+    let path = cx.update(|cx| {
+        workspace.read(cx).store().read(cx).credentials()[0]
+            .key_path
+            .clone()
+            .unwrap()
+    });
+    let kept = std::path::Path::new(path.as_ref());
+    assert!(kept.starts_with(data.path().join("keys")), "{kept:?}");
+    assert_eq!(std::fs::read_to_string(kept).unwrap(), text);
+    assert_eq!(std::fs::read_to_string(&mine).unwrap(), text);
+    // Its passphrase goes with the copy.
+    assert_eq!(
+        secrets
+            .get(&SecretRef::passphrase(kept))
+            .unwrap()
+            .as_deref()
+            .map(String::as_str),
+        Some("correct horse")
+    );
+}
+
 #[gpui_kit::test]
 async fn a_generated_key_with_a_passphrase_is_saved_encrypted(cx: &mut TestAppContext) {
     let data = tempfile::tempdir().unwrap();

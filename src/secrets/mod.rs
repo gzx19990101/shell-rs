@@ -47,6 +47,12 @@ pub enum SecretRef {
     /// 不保存的连接（外部连接，以后还有临时连接）的密码，按这台临时主机的 id
     /// 归属。只在 [`TemporarySecretStore`] 的内存里，从不进钥匙串。
     Temporary { host: u64 },
+    /// 同步的密钥（`shellrs_sync::Keyring`），全机一条：有了它，同步不用每次问同步
+    /// 密码。
+    SyncKeyring,
+    /// 同步经由的服务器的登录密钥（WebDAV 的密码、S3 的 Secret Key），全机一条：
+    /// 一台电脑同时只同步到一个地方。
+    SyncLogin,
 }
 
 impl SecretRef {
@@ -90,6 +96,8 @@ impl SecretRef {
             Self::Credential { keychain_id } => format!("credential:{keychain_id}"),
             Self::Proxy { user, host, port } => format!("proxy:{user}@{host}:{port}"),
             Self::Temporary { host } => format!("temporary:{host}"),
+            Self::SyncKeyring => "sync:keyring".into(),
+            Self::SyncLogin => "sync:login".into(),
         }
     }
 }
@@ -157,6 +165,8 @@ mod tests {
             SecretRef::credential("root@10.0.1.12:22"),
             SecretRef::proxy("root", "10.0.1.12", 22),
             SecretRef::temporary(22),
+            SecretRef::SyncKeyring,
+            SecretRef::SyncLogin,
         ]
         .map(|secret| secret.account());
         for (ix, account) in accounts.iter().enumerate() {

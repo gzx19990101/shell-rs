@@ -20,6 +20,9 @@ app.shortcut.toggle_sidebar:
 app.shortcut.toggle_tool_sidebar:
   zh-CN: 显示或隐藏右侧栏
   en: Show or hide right sidebar
+app.shortcut.toggle_compose_pane:
+  zh-CN: 显示或隐藏撰写窗格
+  en: Show or hide compose pane
 app.shortcut.maximize_window:
   zh-CN: 最大化窗口
   en: Maximize window

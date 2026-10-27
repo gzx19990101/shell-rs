@@ -189,7 +189,7 @@ impl LocalTerminalPanel {
     pub fn shell_title(&self, cx: &App) -> Option<SharedString> {
         let title = self.terminal.read(cx).title(cx)?;
         Some(
-            short_title(&title, super::local_shell::host_name().as_deref())
+            short_title(&title, crate::app::computer_name().as_deref())
                 .into_owned()
                 .into(),
         )

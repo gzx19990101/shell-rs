@@ -5,6 +5,7 @@ mod broadcast;
 mod directory;
 mod directory_setup;
 mod engine;
+mod environment;
 mod exec;
 mod font;
 mod highlight;
@@ -37,6 +38,7 @@ pub use directory_setup::{
     parse_check as parse_directory_check,
 };
 pub use engine::{TerminalCell, TerminalEngine, TerminalEvent, TerminalSnapshot};
+pub(crate) use environment::strip_launcher_vars;
 pub use exec::{ExecTarget, exec_answer};
 pub use font::{
     DEFAULT_FONT_SIZE, DEFAULT_LINE_HEIGHT, FONT_SIZE_RANGE, LINE_HEIGHT_RANGE, TerminalFont,
@@ -70,7 +72,8 @@ pub use send_commands::open_send_commands_dialog;
 pub use terminal_panel::{TerminalPanel, TerminalPanelEvent};
 pub(crate) use terminal_view::terminal_key_bindings;
 pub use terminal_view::{
-    TERMINAL_FIND_KEY_CONTEXT, TERMINAL_KEY_CONTEXT, TerminalMenuItems, TerminalView,
+    ComposePaneShown, TERMINAL_FIND_KEY_CONTEXT, TERMINAL_KEY_CONTEXT, TerminalMenuItems,
+    TerminalView,
 };
 pub use theme::{TerminalColors, TerminalTheme};
 pub(crate) use transport::send_event;

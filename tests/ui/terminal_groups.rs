@@ -1,13 +1,13 @@
-//! 命令广播: the checkboxes on terminal tabs, the split layout and command
-//! bar they bring, and keys shared on request, with an independent
-//! transport log for every participant. No server, PTY or keychain is
-//! touched.
+//! 命令广播: the checkboxes on terminal tabs, the split layout they bring
+//! with 撰写窗格 sending to them all, and keys shared on request, with an
+//! independent transport log for every participant. No server, PTY or
+//! keychain is touched.
 
 use std::collections::HashMap;
 
 use crate::support::*;
 use gpui_kit::component::dock::ToggleZoom;
-use shellrs::app::{BroadcastSnippet, CloseSettings, PasteTerminal};
+use shellrs::app::{CloseSettings, PasteTerminal, SendComposeSnippet};
 use shellrs::host::{SnippetDraft, SnippetId};
 
 struct PerHostTerminals(HashMap<String, Arc<FakeTerminalFactory>>);
@@ -142,13 +142,21 @@ async fn the_toggle_puts_checkboxes_ahead_of_the_tab_marks(cx: &mut TestAppConte
     let fixture = open(cx).await;
     let handle = fixture.handle;
     in_frame(cx, handle, |window, cx| {
-        assert!(window.try_find("broadcast-bar").is_none());
+        assert!(window.try_find("compose-pane").is_none());
         let hide = window.find("toggle-dock:Left").bounds();
         let broadcast = window.find("toggle-terminal-broadcast").bounds();
         let tab = window.find(("terminal-tab", INITIAL_WEB_TERMINAL)).bounds();
         assert!(hide.right() <= broadcast.left());
         assert!(broadcast.right() <= tab.left());
         assert!((hide.center().y - broadcast.center().y).abs() <= px(1.));
+        // The controls run the bar's full height, so their bottom border
+        // lines up with the one under the tabs.
+        let controls = window.find("tab-bar-controls").bounds();
+        let bar = window.find("center-tab-bar").bounds();
+        assert!(bar.size.height > px(0.));
+        assert_eq!(controls.top(), bar.top());
+        assert_eq!(controls.bottom(), bar.bottom());
+        assert!(controls.right() <= bar.left());
         assert!(
             window
                 .find(("terminal-tab-os", INITIAL_WEB_TERMINAL))
@@ -167,13 +175,13 @@ async fn the_toggle_puts_checkboxes_ahead_of_the_tab_marks(cx: &mut TestAppConte
         assert_eq!(checkbox.checked(), Some(false));
         window.click(("broadcast-remote", INITIAL_WEB_TERMINAL), cx);
     });
-    // One checked terminal leaves the layout alone and brings no bar.
+    // One checked terminal leaves the layout alone and brings no pane.
     assert_eq!(
         cx.update(|cx| fixture.workspace.read(cx).active_tab()),
         active
     );
     in_frame(cx, handle, |window, cx| {
-        assert!(window.try_find("broadcast-bar").is_none());
+        assert!(window.try_find("compose-pane").is_none());
         assert_eq!(
             window.find("toggle-terminal-broadcast").label(),
             Some("命令广播 · 勾选至少两个终端")
@@ -198,6 +206,10 @@ async fn the_toggle_puts_checkboxes_ahead_of_the_tab_marks(cx: &mut TestAppConte
     });
     in_frame(cx, handle, |window, cx| {
         assert!(window.find("toggle-terminal-broadcast").visible());
+        // A lone tab is still a tab, selected as it is among others,
+        // rather than a plain title.
+        let tab = window.within("center-tab-bar").find(0usize);
+        assert_eq!(tab.selected(), Some(true));
         window.click(("close-terminal", INITIAL_STAGING_TERMINAL), cx)
     });
     in_frame(cx, handle, |window, _| {
@@ -206,22 +218,26 @@ async fn the_toggle_puts_checkboxes_ahead_of_the_tab_marks(cx: &mut TestAppConte
 }
 
 #[gpui_kit::test]
-async fn checking_two_terminals_splits_them_under_the_command_bar(cx: &mut TestAppContext) {
+async fn checking_two_terminals_splits_them_above_the_compose_pane(cx: &mut TestAppContext) {
     let fixture = open(cx).await;
     let handle = fixture.handle;
     select_pair(cx, handle);
     in_frame(cx, handle, |window, _| {
-        let bar = window.find("broadcast-bar").bounds();
+        let pane = window.find("compose-pane").bounds();
         let web = window.find(("terminal", INITIAL_WEB_TERMINAL));
         let staging = window.find(("terminal", INITIAL_STAGING_TERMINAL));
         assert!(web.visible() && staging.visible());
-        // Side by side, in the order checked, below the bar.
+        // Side by side, in the order checked, above the pane.
         assert!(web.bounds().right() <= staging.bounds().left());
-        assert!(bar.bottom() <= web.bounds().top());
-        assert!(bar.bottom() <= staging.bounds().top());
+        assert!(web.bounds().bottom() <= pane.top());
+        assert!(staging.bounds().bottom() <= pane.top());
+        assert_eq!(
+            window.find("compose-pane-target").label(),
+            Some("勾选的 2 个终端")
+        );
     });
-    // The command line has the keyboard: Enter runs it everywhere, each
-    // terminal pasting the way its program asked.
+    // The pane has the keyboard: Enter runs it everywhere, each terminal
+    // pasting the way its program asked.
     in_frame(cx, handle, |window, cx| {
         window.input("uptime", cx);
         window.press("enter", cx);
@@ -236,10 +252,10 @@ async fn checking_two_terminals_splits_them_under_the_command_bar(cx: &mut TestA
     assert_eq!(fixture.staging.written_text(), "uptime\r");
     // Sent, so the line is empty again; the snippets and Ctrl+C go to all.
     in_frame(cx, handle, |window, cx| {
-        window.dispatch_action(Box::new(BroadcastSnippet(SnippetId(1))), cx);
+        window.dispatch_action(Box::new(SendComposeSnippet(SnippetId(1))), cx);
     });
     in_frame(cx, handle, |window, cx| {
-        window.click("broadcast-interrupt", cx)
+        window.click("compose-interrupt", cx)
     });
     cx.wait_for(handle.into(), Duration::from_secs(2), |_, _| {
         fixture.web.written_text().ends_with('\x03')
@@ -257,10 +273,10 @@ async fn checking_two_terminals_splits_them_under_the_command_bar(cx: &mut TestA
     })
     .await;
     assert!(fixture.staging.written_text().ends_with('\x03'));
-    // Stopping takes the bar and the checkboxes away; the split stays.
-    in_frame(cx, handle, |window, cx| window.click("broadcast-end", cx));
+    // Stopping takes the pane and the checkboxes away; the split stays.
+    in_frame(cx, handle, |window, cx| window.click("compose-close", cx));
     in_frame(cx, handle, |window, _| {
-        assert!(window.try_find("broadcast-bar").is_none());
+        assert!(window.try_find("compose-pane").is_none());
         assert!(
             window
                 .try_find(("broadcast-remote", INITIAL_WEB_TERMINAL))
@@ -378,9 +394,9 @@ async fn unchecking_leaves_the_broadcast_and_new_tabs_are_not_checked(cx: &mut T
     in_frame(cx, handle, |window, cx| {
         window.click(("broadcast-remote", INITIAL_STAGING_TERMINAL), cx)
     });
-    // One left: no bar, nothing shared.
+    // One left: no pane, nothing shared.
     in_frame(cx, handle, |window, cx| {
-        assert!(window.try_find("broadcast-bar").is_none());
+        assert!(window.try_find("compose-pane").is_none());
         window.click(("terminal", INITIAL_WEB_TERMINAL), cx);
         window.input("unshared", cx);
     });
@@ -445,7 +461,7 @@ async fn hidden_tabs_stay_selected_but_reconnected_tabs_leave_broadcast(cx: &mut
                 .checked(),
             Some(false)
         );
-        assert!(window.try_find("broadcast-bar").is_none());
+        assert!(window.try_find("compose-pane").is_none());
     });
 }
 

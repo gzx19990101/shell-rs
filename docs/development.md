@@ -23,9 +23,12 @@ Windows 只在 CI（`.github/workflows/windows.yml`）上编译和测试。
 ```sh
 cargo run
 cargo test
+cargo test -p shellrs-sync   # 只跑同步核心，不编 GPUI
 cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 ```
+
+仓库是 Cargo workspace：根包是桌面应用，`crates/shellrs-sync` 是同步核心（MIT 许可，文件格式见 `crates/shellrs-sync/FORMAT.md`）。不带 `-p` 的 `cargo` 命令同时覆盖两者。
 
 数据目录依次是：`SHELLRS_DATA_DIR`；Windows 便携版（`shellrs.exe` 旁边有 `data` 文件夹、旁边没有安装程序留下的 `unins000.exe`）的 `data`；系统应用数据目录中的 `shellrs`。主机、端口转发规则和凭据（不含密码）保存在 `shellrs.db`，主机信任记录保存在该目录的 `known_hosts`，凭据里粘贴或生成的私钥保存在该目录的 `keys/` 下，密码和私钥口令使用系统钥匙串（服务名 `shellrs`；账户名是主机端点的 `password:<用户>@<地址>:<端口>`、私钥的 `passphrase:<路径>`、密码凭据的 `credential:<随机 ID>` 和代理的 `proxy:<用户>@<代理地址>:<端口>`）。
 

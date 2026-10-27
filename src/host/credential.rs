@@ -178,6 +178,8 @@ pub struct Credential {
     pub key_path: Option<SharedString>,
     /// Position in the credential list.
     pub sort_order: i64,
+    /// When the user last changed it; see [`super::Host::edited_ms`].
+    pub edited_ms: u64,
 }
 
 impl Credential {
@@ -192,6 +194,7 @@ impl Credential {
             user: draft.user,
             key_path: draft.key_path,
             sort_order: 0,
+            edited_ms: 0,
         }
     }
 

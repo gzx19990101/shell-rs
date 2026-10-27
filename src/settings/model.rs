@@ -3,6 +3,7 @@ use gpui_kit::{SharedString, WindowAppearance};
 use serde::{Deserialize, Deserializer, Serialize};
 
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 use crate::app::{ShortcutOverrides, ToolKind};
 use crate::explorer::{FileIconStyle, FileSizeFormat, ShowHiddenFiles};
@@ -40,9 +41,14 @@ pub struct AppSettings {
     /// terminal, as a host keeps its own for its terminals.
     #[serde(with = "tool_by_key")]
     pub local_sidebar_tool: Option<ToolKind>,
+    /// 撰写窗格 below the terminals, switched from its shortcut and the
+    /// terminal's context menu: shown while true. 命令广播 shows it anyway.
+    pub compose_pane: bool,
     /// 终端 → 本地终端.
     pub local_terminal: LocalTerminalSettings,
     pub external_cli: ExternalCliSettings,
+    /// 同步.
+    pub sync: SyncSettings,
     pub update: UpdateSettings,
     /// 关于 → 隐私.
     pub analytics: AnalyticsSettings,
@@ -70,8 +76,9 @@ pub struct AppSettings {
 
 /// What 界面字号 offers, in pixels.
 pub const INTERFACE_FONT_SIZE_RANGE: std::ops::RangeInclusive<f32> = 12.0..=20.0;
-/// gpui-kit's own base font, which the interface had before it could change.
-pub const DEFAULT_INTERFACE_FONT_SIZE: f32 = 16.0;
+/// gpui-kit's own base font, which the interface had before it could change;
+/// on Windows 14, where its body text then is the system's own 9 points.
+pub const DEFAULT_INTERFACE_FONT_SIZE: f32 = if cfg!(windows) { 14.0 } else { 16.0 };
 
 /// 外观 → 常规.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -374,6 +381,83 @@ pub struct ExternalCliSettings {
     /// Whether the `shellrs` command may use the saved hosts. Off until
     /// the user turns it on.
     pub enabled: bool,
+}
+
+/// 同步: where it goes through. Its keys and a WebDAV password are in the
+/// keychain, its state in the database.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SyncSettings {
+    /// Where, while sync is on.
+    pub location: Option<SyncLocation>,
+}
+
+/// Where sync goes through.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum SyncLocation {
+    /// A folder on this computer, which a cloud drive may be syncing.
+    Folder { path: PathBuf },
+    /// A folder on a WebDAV server; its password is in the keychain.
+    #[serde(rename = "webdav")]
+    WebDav { url: String, username: String },
+    /// A folder in an S3 bucket, or one of a service that speaks its API;
+    /// its secret key is in the keychain.
+    S3 {
+        /// The service's address, such as `https://s3.us-east-1.amazonaws.com`.
+        endpoint: String,
+        region: String,
+        bucket: String,
+        /// The folder in the bucket; empty for its top.
+        prefix: String,
+        /// The bucket in the address's path rather than its host.
+        path_style: bool,
+        access_key: String,
+    },
+}
+
+impl SyncLocation {
+    /// Whether `other` is the same place, signed in to maybe otherwise:
+    /// what a new login may change.
+    pub fn same_place(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Folder { path: a }, Self::Folder { path: b }) => a == b,
+            (Self::WebDav { url: a, .. }, Self::WebDav { url: b, .. }) => a == b,
+            (
+                Self::S3 {
+                    endpoint,
+                    region,
+                    bucket,
+                    prefix,
+                    path_style,
+                    ..
+                },
+                Self::S3 {
+                    endpoint: other_endpoint,
+                    region: other_region,
+                    bucket: other_bucket,
+                    prefix: other_prefix,
+                    path_style: other_path_style,
+                    ..
+                },
+            ) => {
+                (endpoint, region, bucket, prefix, path_style)
+                    == (
+                        other_endpoint,
+                        other_region,
+                        other_bucket,
+                        other_prefix,
+                        other_path_style,
+                    )
+            }
+            _ => false,
+        }
+    }
+
+    /// Whether getting there takes a login the keychain keeps.
+    pub fn signs_in(&self) -> bool {
+        !matches!(self, Self::Folder { .. })
+    }
 }
 
 /// 关于 → 应用更新.
@@ -798,18 +882,20 @@ mod tests {
         assert!(!read.local_terminal.keep_output);
     }
 
-    /// 界面字号: gpui-kit's 16 until changed, whole pixels within 12–20.
+    /// 界面字号: gpui-kit's 16 (14 on Windows) until changed, whole pixels
+    /// within 12–20.
     #[test]
     fn the_interface_font_stays_as_it_was_until_changed() {
-        assert_eq!(AppSettings::default().interface.font_size, 16.);
+        let default = if cfg!(windows) { 14. } else { 16. };
+        assert_eq!(AppSettings::default().interface.font_size, default);
         let settings: AppSettings = serde_json::from_str(r#"{"interface":{}}"#).unwrap();
-        assert_eq!(settings.interface.font_size, 16.);
+        assert_eq!(settings.interface.font_size, default);
         for (written, kept) in [
             (14., 14.),
             (14.6, 15.),
             (8., 12.),
             (30., 20.),
-            (f32::NAN, 16.),
+            (f32::NAN, default),
         ] {
             let settings = AppSettings {
                 interface: InterfaceSettings { font_size: written },

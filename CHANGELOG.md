@@ -4,6 +4,73 @@
 
 One section per version, titled `## [version]`, optionally followed by a date. Each section is written in English here and in Chinese in [CHANGELOG.zh.md](CHANGELOG.zh.md), in the same change. The release workflow (`.github/workflows/release.yml`) takes the section with the tag’s version, as it is, for the GitHub release. The website’s changelog shows this file in English and Japanese and CHANGELOG.zh.md in Chinese (ShellRS’s update dialog opens it with What’s new). Written in Markdown, for users.
 
+## [0.1.16]
+
+### Added
+
+- Cloud sync: sync your data between computers, end-to-end encrypted (E2EE): it’s encrypted before it leaves this computer, so remote storage holds only ciphertext, and only devices with the password can read it.
+- When the tabs don’t fit, scroll the tab bar sideways with the mouse wheel.
+
+### Fixed
+
+- In a terminal, Home and End didn’t move to the start and end of the line when zsh on the server was set up with oh-my-zsh and the like.
+
+## [0.1.16-beta.1]
+
+### Added
+
+- Cloud sync: sync your data between computers, end-to-end encrypted (E2EE): it’s encrypted before it leaves this computer, so remote storage holds only ciphertext, and only devices with the password can read it.
+- When the tabs don’t fit, scroll the tab bar sideways with the mouse wheel.
+
+## [0.1.15]
+
+### Added
+
+- Compose pane: write and edit commands below the terminal, several lines if you like, before sending them. Open it with ⌘⇧E (Ctrl+Shift+E on Windows and Linux) or from the terminal’s context menu. Command broadcast’s command bar is now the compose pane.
+- Middle-click a tab to close it, as × does.
+
+### Improved
+
+- On Windows the interface font size defaults to 14, the same size as the system’s own text.
+- Importing hosts no longer lists hosts whose username is git, or the addresses of GitHub, GitLab and other code hosting services, which are for pushing and pulling code, not for logging in.
+- With only one tab left, it still looks like a selected tab, as it does among others.
+
+### Fixed
+
+- On Windows, the dialog of “Upload…” showed only folders, so no file could be chosen.
+- In the Linux AppImage, commands such as cargo and rustc failed with “unknown proxy name” in a local terminal running zsh.
+- When the computer was busy, files dropped on a remote terminal were sometimes asked for in a dialog instead of going up at once.
+- In a terminal, typing with an input method after moving the cursor back into text already typed put the composition on top of the text after it, so neither could be read.
+- The borders around the buttons at either end of the tab bar didn’t line up with the tab bar’s bottom line.
+- The bottoms of letters such as g and p were cut off in tab names.
+
+## [0.1.15-beta.2]
+
+### Improved
+
+- With only one tab left, it still looks like a selected tab, as it does among others.
+
+### Fixed
+
+- In a terminal, typing with an input method after moving the cursor back into text already typed put the composition on top of the text after it, so neither could be read.
+
+## [0.1.15-beta.1]
+
+### Added
+
+- Compose pane: write and edit commands below the terminal, several lines if you like, before sending them. Open it with ⌘⇧E (Ctrl+Shift+E on Windows and Linux) or from the terminal’s context menu. Command broadcast’s command bar is now the compose pane.
+
+### Improved
+
+- On Windows the interface font size defaults to 14, the same size as the system’s own text.
+- Importing hosts no longer lists hosts whose username is git, or the addresses of GitHub, GitLab and other code hosting services, which are for pushing and pulling code, not for logging in.
+
+### Fixed
+
+- On Windows, the dialog of “Upload…” showed only folders, so no file could be chosen.
+- The borders around the buttons at either end of the tab bar didn’t line up with the tab bar’s bottom line.
+- The bottoms of letters such as g and p were cut off in tab names.
+
 ## [0.1.14]
 
 ### Added

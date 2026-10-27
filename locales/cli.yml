@@ -403,6 +403,9 @@ cli.change.credential_gone:
 cli.change.key_not_saved:
   zh-CN: 私钥未能保存：%{error}
   en: "Couldn't save the private key: %{error}"
+cli.change.key_not_copied:
+  zh-CN: 私钥文件未能复制到 ShellRS 保存私钥的目录：%{error}
+  en: "Couldn’t copy the key file to the folder ShellRS keeps keys in: %{error}"
 # One failure after another.
 cli.change.failures:
   zh-CN: "%{before}；%{next}"

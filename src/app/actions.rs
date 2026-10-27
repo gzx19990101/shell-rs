@@ -1,8 +1,11 @@
 //! Every user command, so toolbar buttons, menus and key bindings dispatch
 //! the same action and cannot disagree.
 
+use std::path::PathBuf;
+
 use gpui_kit::component::{Icon, IconName};
 use gpui_kit::*;
+use shellrs_sync::DeviceId;
 
 use super::{CatalogIcon, DOCKER_ICON};
 use crate::i18n::t;
@@ -43,10 +46,13 @@ gpui_kit::actions!(
         /// Start 命令广播, which turns terminal tab marks into checkboxes,
         /// or end it.
         ToggleTerminalBroadcast,
-        /// Send the command bar's line to every terminal of 命令广播.
-        SendBroadcastCommand,
-        /// Send Ctrl+C to every terminal of 命令广播.
-        InterruptBroadcast,
+        /// Show or hide 撰写窗格, the compose pane below the terminals.
+        ToggleComposePane,
+        /// Run what 撰写窗格 holds in the terminal in front, or in every
+        /// terminal of 命令广播.
+        SendCompose,
+        /// Send Ctrl+C where 撰写窗格 sends.
+        SendComposeInterrupt,
         /// Whether typing in one terminal of 命令广播 goes to the others too.
         ToggleBroadcastKeys,
         /// Copy the active terminal selection.
@@ -206,6 +212,26 @@ gpui_kit::actions!(
         OpenChangelog,
         /// Open the ShellRS website.
         OpenWebsite,
+        /// 开启同步 › 选择文件夹…: pick the folder to sync through, then make
+        /// sync there or join it.
+        SetUpSync,
+        /// 开启同步 › 连接 WebDAV…: name the server and the login, then make
+        /// sync there or join it.
+        SetUpWebDavSync,
+        /// 开启同步 › 连接 S3…: name the bucket and its keys, then make sync
+        /// there or join it.
+        SetUpS3Sync,
+        /// Sign in anew to the WebDAV server or bucket sync goes through.
+        ChangeSyncLogin,
+        /// Run a round of sync now.
+        SyncNow,
+        /// Open what sync waits for the user to settle: a password, a
+        /// reset, deletions to agree to.
+        ReviewSync,
+        /// Open 更换同步密码, which changes the data key too.
+        ChangeSyncPassword,
+        /// Open 关闭同步.
+        TurnOffSync,
     ]
 );
 
@@ -280,6 +306,13 @@ id_actions! {
     /// Open the dialog that gives one SFTP tab its own title.
     RenameExplorer(ExplorerId);
 
+    /// Make sync in this folder, or join the sync there: what the folder
+    /// picker of 开启同步… chose.
+    SetUpSyncIn(PathBuf);
+    /// Ask first, then take a device out of sync: its file in the folder
+    /// goes.
+    RemoveSyncDevice(DeviceId);
+
     /// Install (or update) the agent skill for one agent.
     InstallAgentSkill(AgentKind);
     /// Remove the agent skill of one agent.
@@ -336,9 +369,9 @@ id_actions! {
     EditSnippet(SnippetId);
     /// Ask for confirmation, then delete a snippet.
     DeleteSnippet(SnippetId);
-    /// Send a snippet to every terminal of 命令广播, as a click on it in
-    /// 命令片段 would to one.
-    BroadcastSnippet(SnippetId);
+    /// Send a snippet where 撰写窗格 sends: the terminal in front, or every
+    /// terminal of 命令广播.
+    SendComposeSnippet(SnippetId);
     /// Open the rename dialog of a snippet category.
     RenameSnippetCategory(SnippetCategoryId);
     /// Ask for confirmation, then delete a snippet category with the

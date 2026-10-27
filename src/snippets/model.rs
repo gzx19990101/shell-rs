@@ -79,10 +79,7 @@ mod tests {
     use crate::host::SnippetDraft;
 
     fn category(id: u64, name: &str) -> SnippetCategory {
-        SnippetCategory {
-            id: SnippetCategoryId(id),
-            name: name.into(),
-        }
+        SnippetCategory::new(SnippetCategoryId(id), name)
     }
 
     fn snippet(id: u64, name: &str, category: Option<u64>) -> Snippet {

@@ -1,0 +1,5 @@
+# On macOS, programs run through scripts/macos-run.sh, which signs ShellRS
+# first when SHELLRS_SIGN_IDENTITY is set, for the keychain to stop asking
+# after each build.
+[target.'cfg(target_os = "macos")']
+runner = "scripts/macos-run.sh"

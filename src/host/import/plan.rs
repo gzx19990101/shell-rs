@@ -8,6 +8,7 @@ use gpui_kit::{Context, SharedString};
 
 use crate::i18n::t;
 
+use super::super::private_key::read_small;
 use super::super::{
     AuthKind, CredentialDraft, CredentialId, CredentialKind, DEFAULT_USER, GroupPathError,
     HostDraft, HostDraftError, HostStore,
@@ -104,18 +105,21 @@ fn default_auth(candidate: &ImportCandidate, store: &HostStore) -> RowAuth {
     }
 }
 
-/// A saved key credential for this file and user.
+/// A saved key credential for this file and user: one naming the file,
+/// or one keeping a copy of it, as importing it makes.
 fn saved_key(store: &HostStore, path: &Path, user: &str) -> Option<CredentialId> {
+    let same_key = |key: &str| {
+        Path::new(key) == path
+            || (store.keeps_key_file(key)
+                && read_small(Path::new(key)).is_some_and(|kept| Some(kept) == read_small(path)))
+    };
     store
         .credentials()
         .iter()
         .find(|credential| {
             credential.kind == CredentialKind::Key
                 && credential.user.as_ref() == user
-                && credential
-                    .key_path
-                    .as_ref()
-                    .is_some_and(|key| Path::new(key.as_ref()) == path)
+                && credential.key_path.as_deref().is_some_and(same_key)
         })
         .map(|credential| credential.id)
 }
@@ -291,7 +295,26 @@ pub fn apply_import(
         entries,
         credentials,
     } = plan;
-    let (credentials, failures) = store.capture_failures(cx, |store, cx| {
+    let mut not_copied = Vec::new();
+    // Each key file is copied among ShellRS's own keys, which is what
+    // syncs; one that cannot be is used where it is.
+    let credentials: Vec<CredentialDraft> = credentials
+        .into_iter()
+        .map(|draft| {
+            let Some(path) = draft.key_path.clone() else {
+                return draft;
+            };
+            match store.keep_key_file(None, &path) {
+                Ok(Some(kept)) => draft.with_key_path(kept),
+                Ok(None) => draft,
+                Err(error) => {
+                    not_copied.push(t!("host.import.key_not_copied", error = error));
+                    draft
+                }
+            }
+        })
+        .collect();
+    let (credentials, mut failures) = store.capture_failures(cx, |store, cx| {
         store.in_one_transaction(cx, |store, cx| {
             let made: Vec<CredentialId> = credentials
                 .into_iter()
@@ -313,6 +336,7 @@ pub fn apply_import(
             made.len()
         })
     });
+    failures.extend(not_copied);
     Imported {
         hosts: entries.len(),
         credentials,
@@ -565,6 +589,38 @@ mod tests {
             let credential = &store.credentials()[0];
             assert_eq!(credential.key_path.as_deref(), Some("/k/deploy"));
             assert_eq!(credential.user.as_ref(), "deploy");
+        });
+    }
+
+    /// Imported keys are copied among ShellRS's own, which is what syncs,
+    /// and importing again knows the copy for the file.
+    #[gpui_kit::test]
+    fn an_imported_key_is_copied_and_known_again(cx: &mut gpui_kit::TestAppContext) {
+        use gpui_kit::AppContext as _;
+
+        let data = tempfile::tempdir().unwrap();
+        let key = data.path().join("id_deploy");
+        std::fs::write(&key, "the key").unwrap();
+        let identity = key.display().to_string();
+        let store = cx.new(|_| HostStore::empty().with_key_dir(data.path().join("keys")));
+        store.update(cx, |store, cx| {
+            let rows = import_rows(
+                &scan(vec![candidate("web", "10.0.0.1", Some(&identity))]),
+                store,
+            );
+            let imported = apply_import(plan_import(&rows, store).unwrap(), store, cx);
+            assert_eq!(imported.credentials, 1);
+            let kept = store.credentials()[0].key_path.clone().unwrap();
+            assert!(store.keeps_key_file(&kept), "{kept}");
+            assert_eq!(std::fs::read_to_string(kept.as_ref()).unwrap(), "the key");
+
+            let rows = import_rows(
+                &scan(vec![candidate("api", "10.0.0.2", Some(&identity))]),
+                store,
+            );
+            let imported = apply_import(plan_import(&rows, store).unwrap(), store, cx);
+            assert_eq!(imported.credentials, 0, "the copy is the same key");
+            assert_eq!(store.credentials().len(), 1);
         });
     }
 }

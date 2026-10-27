@@ -1,0 +1,20 @@
+{
+  "format": 1,
+  "vault_id": "238d949198559cdb5d4535ed7d92bc78",
+  "kdf": {
+    "algorithm": "argon2id",
+    "version": 19,
+    "memory_kib": 8,
+    "passes": 1,
+    "parallelism": 1,
+    "salt": "8eb8e2cd751ed7aaf204a1d58a938062"
+  },
+  "current": 1,
+  "keys": [
+    {
+      "generation": 1,
+      "nonce": "f412201a7171b8554247e814fd78e53a6de3a3b3d6a8cb55",
+      "wrapped": "81dbfd0ed70d2340691fc90ae8edb11faf0b34fed480127ac187baac357d86ab62d6ab05ea7feb18034d3fbece4f303a"
+    }
+  ]
+}

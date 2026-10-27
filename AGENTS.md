@@ -21,6 +21,7 @@ cargo test                                  # 单元测试（模块内）+ tests
 cargo test --lib                            # 只跑单元测试
 cargo test --test ui                        # 只跑 UI 集成测试
 cargo test --test ui new_host -- --nocapture   # 按名称片段跑单个 UI 测试
+cargo test -p shellrs-sync                  # 只跑同步核心
 cargo clippy --all-targets -- -D warnings   # 必须无警告
 cargo fmt --check
 
@@ -35,7 +36,7 @@ cargo test -- --ignored                     # 会读写真实钥匙串的测试�
 
 ## 架构
 
-单个二进制 crate，带 `src/lib.rs`，这样 `tests/ui/` 能驱动生产环境的 `Workspace`。模块按能力划分，将来可拆成独立 crate；功能模块不得依赖 `workspace`（窗口壳），也不得触碰彼此的内部实现。
+Cargo workspace：根包是桌面应用 `shellrs`，单个二进制 crate，带 `src/lib.rs`，这样 `tests/ui/` 能驱动生产环境的 `Workspace`；`crates/shellrs-sync` 是同步核心（MIT 许可，不依赖 GPUI 和应用，文件格式见它的 `FORMAT.md`）。模块按能力划分，将来可拆成独立 crate；功能模块不得依赖 `workspace`（窗口壳），也不得触碰彼此的内部实现。
 
 - `app/` — `actions.rs` 定义全部用户命令（`gpui_kit::actions!` 单元动作 + 携带 `HostId` / `GroupId` 的 `host_action!` / `group_action!` 动作）；`paths.rs` 解析数据目录（`SHELLRS_DATA_DIR` → Windows 便携版 `shellrs.exe` 旁边的 `data` → `dirs::data_dir()/shellrs`）与数据库路径；`mod.rs` 绑定快捷键、初始化 gpui-kit 并 `set_locale("zh-CN")`；`assets.rs` 用 `icon_assets!` 把额外的 Lucide 图标并入默认图标包——额外图标用 `CatalogIcon::*`，默认包用 `IconName::*`；`OS_ICONS` 另外嵌入 `assets/icons/os/*.svg`（各操作系统的真实 logo，取自 Simple Icons，CC0；Windows 那个是自己画的四格，Simple Icons 已下架），用 `Icon::default().path(os.icon_path())` 渲染。
 - `host/` — `model.rs`（Host / HostGroup / HostDraft / GroupDraft / `HostOs`；`Host.group` 与 `HostGroup.parent` 都是 `Option<GroupId>`，`Host.os` 是 `Option<HostOs>`）、`database.rs`（`HostDatabase`：rusqlite 连接、`PRAGMA user_version` 迁移、行与模型的映射）、`store.rs`（`HostStore` 实体，**内存是唯一事实来源**，写穿到数据库）、`outline.rs`（纯函数：store → `TreeItem`，递归铺开嵌套分组；节点 id 形如 `g:<id>` / `s:<id>`；`group_options` 给表单提供按全路径标注的分组列表）、`host_panel.rs`（左侧 Dock 面板：搜索 + 树 + 右键菜单）、`host_dialog.rs`、`group_dialog.rs`（`GroupForm`、`open_group_dialog`、`confirm_delete_group`）。

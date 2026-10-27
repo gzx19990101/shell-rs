@@ -47,4 +47,7 @@ pub use secret_fields::SecretFields;
 pub use serial_settings::*;
 pub use snippet::*;
 pub use ssh_link::{LinkKind, SshLink, standard_url};
-pub use store::{HostStore, HostStoreEvent};
+pub use store::{
+    ApplyError, HostStore, HostStoreEvent, SecretEndpoint, SecretPlace, SecretSource, SecretWork,
+    SecretsRead, SecretsWritten, SyncExport, read_secrets,
+};

@@ -9,6 +9,7 @@ mod support;
 
 mod analytics;
 mod cli;
+mod compose;
 mod connection;
 mod credential;
 mod docker;
@@ -31,6 +32,7 @@ mod settings;
 mod sftp;
 mod shortcuts;
 mod snippets;
+mod sync;
 mod telnet;
 mod terminal;
 mod terminal_groups;

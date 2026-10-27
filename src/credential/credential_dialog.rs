@@ -389,7 +389,7 @@ impl CredentialForm {
         )
         .with_key_path(key_path)
         .validated();
-        let draft = match draft {
+        let mut draft = match draft {
             Ok(draft) => draft,
             Err(error) => return self.fail(error.to_string(), window, cx),
         };
@@ -397,6 +397,25 @@ impl CredentialForm {
         let password_change = password_change.filter(|_| draft.kind == CredentialKind::Password);
         if !key_from_text {
             let passphrase_change = passphrase_change.filter(|_| draft.key_path.is_some());
+            // A file of the user's is copied among ShellRS's own keys,
+            // which is what syncs; the file itself is left as it is.
+            let copied = match draft.key_path.as_deref() {
+                Some(path) if draft.kind == CredentialKind::Key => {
+                    self.store.read(cx).keep_key_file(self.editing, path)
+                }
+                _ => Ok(None),
+            };
+            match copied {
+                Ok(Some(path)) => draft.key_path = Some(path),
+                Ok(None) => {}
+                Err(error) => {
+                    return self.fail(
+                        t!("credential.dialog.key_not_copied", error = error),
+                        window,
+                        cx,
+                    );
+                }
+            }
             return self.save(draft, None, password_change, passphrase_change, window, cx);
         }
 
@@ -546,8 +565,10 @@ impl CredentialForm {
             return false;
         };
         match (self.kind, self.source) {
+            // Another file is copied over the kept one, as a paste is.
             (CredentialKind::Key, KeySource::File) => {
-                self.fields.read(cx).key_path(cx) != kept.as_ref()
+                self.store.read(cx).key_dir().is_none()
+                    && self.fields.read(cx).key_path(cx) != kept.as_ref()
             }
             (CredentialKind::Key, KeySource::Paste | KeySource::Generate) => false,
             (CredentialKind::Password | CredentialKind::Agent, _) => true,

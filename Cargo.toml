@@ -1,6 +1,6 @@
 [package]
 name = "shellrs"
-version = "0.1.14"
+version = "0.1.16"
 edition = "2024"
 publish = false
 description = "SSH client and host manager: terminal, SFTP, port forwarding"
@@ -19,6 +19,13 @@ path = "src/main.rs"
 [[bin]]
 name = "shellrs-cli"
 path = "src/bin/shellrs-cli.rs"
+
+# The sync core is a crate of its own, under MIT, so the mobile apps can
+# link it as well. Cargo commands here build, test and lint it too.
+[workspace]
+members = ["crates/shellrs-sync"]
+default-members = [".", "crates/shellrs-sync"]
+resolver = "3"
 
 [dependencies]
 gpui-kit = { version = "0.6.1", features = [
@@ -80,6 +87,9 @@ url = "2"
 percent-encoding = "2"
 zeroize = "1"
 keyring = "4"
+# Sync between devices; its own crate, under MIT, so the mobile apps can
+# link it too.
+shellrs-sync = { path = "crates/shellrs-sync" }
 trash = "5"
 # Online update: the signed manifest, its versions and the downloads. The
 # default features keep rustls with the OS trust store and the system proxy
@@ -176,6 +186,9 @@ crypto-bigint = { opt-level = 3 }
 crypto-primes = { opt-level = 3 }
 bcrypt-pbkdf = { opt-level = 3 }
 blowfish = { opt-level = 3 }
+# The sync key's Argon2id, over 64 MiB, takes seconds unoptimized.
+argon2 = { opt-level = 3 }
+blake2 = { opt-level = 3 }
 # The editor parses whole files of up to 5 MB to highlight them.
 tree-sitter = { opt-level = 3 }
 tree-sitter-bash = { opt-level = 3 }

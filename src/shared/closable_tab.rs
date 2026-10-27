@@ -25,9 +25,10 @@ type MenuBuilder = Rc<dyn Fn(PopupMenu, &mut Window, &mut Context<PopupMenu>) ->
 /// hosts instead) and removes the panel from the dock itself.
 ///
 /// Double-clicking the title shows or hides the host sidebar, the way a
-/// double click on an editor tab gives it the room elsewhere.
+/// double click on an editor tab gives it the room elsewhere. A middle click
+/// on a closable one closes it, as browsers and Windows Terminal do (#65).
 ///
-/// The context menu and the double click hang on the title rather than on
+/// The context menu and the clicks hang on the title rather than on
 /// the dock's `Tab`, which the application does not render. The tab's own
 /// horizontal padding is therefore outside them; clicks there only select.
 #[derive(IntoElement)]
@@ -99,6 +100,7 @@ impl RenderOnce for ClosableTabTitle {
         let offline = self
             .connection_state
             .is_some_and(|state| !state.is_connected());
+        let middle_close = self.close.as_ref().map(|(_, action)| action.boxed_clone());
         let row = h_flex()
             .id("title")
             .gap_1()
@@ -106,9 +108,12 @@ impl RenderOnce for ClosableTabTitle {
             .child(
                 div()
                     // A long title, such as a command line a shell names the
-                    // tab after, gives way rather than the tab bar.
+                    // tab after, gives way rather than the tab bar. The
+                    // ellipsis cuts it to width; clipping would also cut
+                    // the descenders of g and p, as the tab sets the line
+                    // height to the font size.
                     .max_w(rems(20.))
-                    .overflow_hidden()
+                    .min_w_0()
                     .whitespace_nowrap()
                     .text_ellipsis()
                     .when(offline, |label| {
@@ -148,6 +153,14 @@ impl RenderOnce for ClosableTabTitle {
                 if event.click_count() == 2 {
                     window.dispatch_action(Box::new(ToggleHostPanel), cx);
                 }
+            })
+            .when_some(middle_close, |title, action| {
+                title.on_aux_click(move |event, window, cx| {
+                    if event.is_middle_click() {
+                        cx.stop_propagation();
+                        window.dispatch_action(action.boxed_clone(), cx);
+                    }
+                })
             })
             .test_support()
             .aria_label(self.label)

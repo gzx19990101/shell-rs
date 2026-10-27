@@ -248,11 +248,12 @@ impl Workspace {
     }
 
     /// The quit guard: with changes not saved, ask before quitting and hold
-    /// the quit back (true) until the user agrees.
+    /// the quit back (true) until the user agrees; then, with something not
+    /// synced yet, hold it back for a last round.
     pub(super) fn ask_before_quit(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
         let unsaved = self.all_unsaved_files(cx);
         if unsaved.is_empty() {
-            return false;
+            return self.sync_before_quit(cx);
         }
         // A hidden window (closed on macOS) would ask where nobody sees it.
         crate::app::bring_forward(window, cx);

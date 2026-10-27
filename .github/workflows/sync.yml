@@ -1,0 +1,57 @@
+# The sync core (crates/shellrs-sync), on its own: it builds without GPUI,
+# so this takes minutes. Its tests also run with the app's (`cargo test`)
+# and on Windows (windows.yml); its WebDAV and S3 stores against real
+# servers (Apache, versitygw) only here.
+name: sync
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "crates/shellrs-sync/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".github/workflows/sync.yml"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v4
+      # rust-toolchain.toml picks the toolchain; this installs it with the
+      # components it lists before the cache key is computed.
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt -p shellrs-sync --check
+      - run: cargo clippy -p shellrs-sync --all-targets -- -D warnings
+      - run: cargo test --locked -p shellrs-sync
+      # The WebDAV store against Apache's mod_dav, which its ignored tests
+      # start on a port of their own.
+      - run: sudo apt-get update && sudo apt-get install -y apache2
+      - run: cargo test --locked -p shellrs-sync webdav -- --include-ignored
+      # The S3 store against versitygw, a gateway that keeps buckets in a
+      # folder: a pinned release, checked against its digest. The tests
+      # make their own buckets.
+      - name: S3 against versitygw
+        env:
+          ROOT_ACCESS_KEY: shellrs
+          ROOT_SECRET_KEY: shellrs-test-secret
+          VERSITYGW: https://github.com/versity/versitygw/releases/download/v1.8.0/versitygw_v1.8.0_Linux_x86_64.tar.gz
+          VERSITYGW_SHA256: 2ba2c734d10d2c4e651d03182cb4b246656bc735a2f282db7b0b73fba6073467
+        run: |
+          mkdir -p "$RUNNER_TEMP/vgw" "$RUNNER_TEMP/vgw-data" "$RUNNER_TEMP/vgw-iam"
+          curl -sSfL -o "$RUNNER_TEMP/vgw.tar.gz" "$VERSITYGW"
+          echo "$VERSITYGW_SHA256  $RUNNER_TEMP/vgw.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/vgw.tar.gz" -C "$RUNNER_TEMP/vgw"
+          gw=$(find "$RUNNER_TEMP/vgw" -name versitygw -type f | head -1)
+          "$gw" --port :7070 --iam-dir "$RUNNER_TEMP/vgw-iam" posix "$RUNNER_TEMP/vgw-data" &
+          for _ in $(seq 50); do curl -s -o /dev/null http://127.0.0.1:7070 && break; sleep 0.2; done
+          SHELLRS_TEST_S3_ENDPOINT=http://127.0.0.1:7070 \
+          SHELLRS_TEST_S3_ACCESS_KEY="$ROOT_ACCESS_KEY" \
+          SHELLRS_TEST_S3_SECRET_KEY="$ROOT_SECRET_KEY" \
+            cargo test --locked -p shellrs-sync s3 -- --include-ignored

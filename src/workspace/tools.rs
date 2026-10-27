@@ -63,7 +63,7 @@ impl ToolTarget {
         }
     }
 
-    fn tab(self) -> CenterTab {
+    pub(super) fn tab(self) -> CenterTab {
         match self {
             Self::Remote(id) => CenterTab::Terminal(id),
             Self::Local(id) => CenterTab::LocalTerminal(id),
@@ -856,6 +856,8 @@ impl Workspace {
                 self.focus_center(window, cx);
             }
         }
+        // 撰写窗格 sends to the same terminal.
+        self.sync_compose(window, cx);
         // The switch comes and goes with the terminal, and marks the tool.
         cx.notify();
     }

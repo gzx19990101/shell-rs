@@ -1,0 +1,256 @@
+_version: 2
+
+# 同步: why a job stopped, and the dialogs that take a sync password or
+# turn sync off. The errors are whole sentences: shown alone over a dialog,
+# and after 「未能同步：」 on the settings page.
+
+sync.error.unavailable:
+  zh-CN: 这台电脑上没有可用的系统钥匙串，同步的密钥无处保存。
+  en: This computer has no system keychain to keep the sync keys in.
+sync.error.no_keyring:
+  zh-CN: 钥匙串里没有同步的密钥，需要再输入一次同步密码。
+  en: The keychain doesn’t have the sync keys. Enter the sync password again.
+sync.error.no_login:
+  zh-CN: 钥匙串里没有同步位置的密码或密钥。
+  en: The keychain doesn’t have the sync location’s password or key.
+sync.error.in_progress:
+  zh-CN: 正在同步，等这一轮结束再试。
+  en: Sync is running. Try again once it’s done.
+sync.error.busy:
+  zh-CN: 同步期间数据一直在变，下次再同步。
+  en: The data kept changing while syncing. It syncs next time.
+sync.error.vault_missing:
+  zh-CN: 同步文件夹里没有同步数据。如果网盘还在下载，稍后再试。
+  en: The sync folder has no sync data. If the cloud drive is still downloading, try again later.
+sync.error.vault_exists:
+  zh-CN: 另一台设备刚在这个文件夹里开启了同步。重新开启同步，改为加入它。
+  en: Another device just set up sync in this folder. Turn on sync again to join it.
+sync.error.vault_too_new:
+  zh-CN: 这个文件夹里的同步来自更新版本的 ShellRS，升级后才能使用。
+  en: The sync in this folder is from a newer ShellRS. Update to use it.
+sync.error.bad_vault:
+  zh-CN: 同步文件夹里的 vault.json 已损坏：%{reason}
+  en: "The vault.json in the sync folder is damaged: %{reason}"
+sync.error.wrong_password:
+  zh-CN: 同步密码不对。
+  en: That’s not the sync password.
+sync.error.needs_password:
+  zh-CN: 同步密码已在别的设备上更改。
+  en: The sync password was changed on another device.
+sync.error.vault_replaced:
+  zh-CN: 同步已在别的设备上重置。
+  en: Sync was reset on another device.
+sync.error.state_unreadable:
+  zh-CN: 这台电脑的同步状态读不出来：%{reason}。关闭同步再开启即可恢复。
+  en: "This computer’s sync state can’t be read: %{reason}. Turn sync off and on again to recover."
+sync.error.mass_delete.one:
+  en: This sync would delete %{count} of %{of} records.
+sync.error.mass_delete.other:
+  zh-CN: 这次同步会删除 %{of} 条记录中的 %{count} 条。
+  en: This sync would delete %{count} of %{of} records.
+sync.error.read_only:
+  zh-CN: 另一台设备的 ShellRS 更新，这台电脑升级后才能继续同步。
+  en: Another device runs a newer ShellRS. Update this computer to keep syncing.
+sync.error.random:
+  zh-CN: 系统的随机数源出错了。
+  en: The system’s random number source failed.
+sync.error.store.not_found:
+  zh-CN: 同步文件夹里找不到需要的文件。
+  en: A file sync needs isn’t in the sync folder.
+sync.error.store.changed:
+  zh-CN: 同步文件夹里的文件刚被别的设备改过，稍后再试。
+  en: Another device just changed the files in the sync folder. Try again later.
+sync.error.store.too_large:
+  zh-CN: 同步文件夹里有文件大得不正常。
+  en: A file in the sync folder is unusually large.
+sync.error.store.timeout:
+  zh-CN: 同步文件夹没有响应。
+  en: The sync folder isn’t responding.
+sync.error.store.unauthorized:
+  zh-CN: 同步的位置拒绝了访问：检查用户名和密码，或文件夹的权限。
+  en: The sync location refused access. Check the username and password, or the folder’s permissions.
+sync.error.store.unavailable:
+  zh-CN: 同步文件夹暂时用不了：%{reason}
+  en: "The sync folder isn’t available for now: %{reason}"
+sync.error.store.io:
+  zh-CN: 读写同步文件夹失败：%{reason}
+  en: "Couldn’t read or write the sync folder: %{reason}"
+
+# The password dialogs.
+sync.dialog.create_title:
+  zh-CN: 创建同步
+  en: Set up sync
+sync.dialog.join_title:
+  zh-CN: 加入同步
+  en: Join sync
+sync.dialog.new_password_title:
+  zh-CN: 输入新的同步密码
+  en: Enter the new sync password
+sync.dialog.reset_title:
+  zh-CN: 重新加入同步
+  en: Rejoin sync
+sync.dialog.change_title:
+  zh-CN: 更换同步密码
+  en: Change sync password
+sync.dialog.create_description:
+  zh-CN: 这个文件夹里还没有同步。设一个同步密码，别的电脑加入时要输入它。
+  en: This folder has no sync yet. Choose a sync password; your other computers ask for it when they join.
+sync.dialog.join_description:
+  zh-CN: 这个文件夹里已有同步。输入创建时设的同步密码，这台电脑上的数据会和其他设备的合并。
+  en: This folder has sync already. Enter its sync password; what’s on this computer is merged with the other devices’.
+sync.dialog.new_password_description:
+  zh-CN: 同步密码已在别的设备上更改，输入新密码后继续同步。
+  en: The sync password was changed on another device. Enter the new one to keep syncing.
+sync.dialog.reset_description:
+  zh-CN: 同步已在别的设备上重置。输入现在的同步密码重新加入，这台电脑上的数据会和其他设备的合并。
+  en: Sync was reset on another device. Enter its sync password to rejoin; what’s on this computer is merged with the other devices’.
+sync.dialog.change_description:
+  zh-CN: 同时换一把新的数据密钥：已移除的设备即使知道旧密码，也读不了之后的数据。别的设备下次同步时要输入新密码。
+  en: A new data key comes with it, so a removed device can’t read anything newer even with the old password. Your other devices ask for the new password when they next sync.
+sync.dialog.create:
+  zh-CN: 创建同步
+  en: Set up sync
+sync.dialog.join:
+  zh-CN: 加入同步
+  en: Join sync
+sync.dialog.continue:
+  zh-CN: 继续同步
+  en: Keep syncing
+sync.dialog.change:
+  zh-CN: 更换
+  en: Change
+sync.dialog.creating:
+  zh-CN: 正在创建同步…
+  en: Setting up sync…
+sync.dialog.joining:
+  zh-CN: 正在加入同步…
+  en: Joining sync…
+sync.dialog.changing:
+  zh-CN: 正在更换…
+  en: Changing…
+sync.dialog.too_short:
+  zh-CN: 同步密码至少要 %{count} 个字符。
+  en: The sync password needs at least %{count} characters.
+sync.dialog.mismatch:
+  zh-CN: 两次输入的同步密码不一样。
+  en: The two passwords don’t match.
+sync.dialog.password_missing:
+  zh-CN: 输入同步密码。
+  en: Enter the sync password.
+sync.dialog.new_password:
+  zh-CN: 新的同步密码
+  en: New sync password
+sync.dialog.password:
+  zh-CN: 同步密码
+  en: Sync password
+sync.dialog.repeat:
+  zh-CN: 再输入一次
+  en: Confirm password
+sync.dialog.generate:
+  zh-CN: 生成随机密码
+  en: Generate password
+sync.dialog.cannot_recover:
+  zh-CN: 忘了同步密码就无法找回，记在安全的地方。
+  en: A forgotten sync password can’t be recovered. Keep it somewhere safe.
+
+# 关闭同步.
+sync.turn_off.title:
+  zh-CN: 关闭同步？
+  en: Turn off sync?
+sync.turn_off.description:
+  zh-CN: 这台电脑上的数据保留不动，之后的改动不再同步。
+  en: What’s on this computer stays as it is; later changes aren’t synced.
+sync.turn_off.delete_file:
+  zh-CN: 同时删除这台电脑在同步文件夹里的文件
+  en: Also delete this computer’s file in the sync folder
+sync.turn_off.commit:
+  zh-CN: 关闭同步
+  en: Turn off sync
+
+# The WebDAV dialog.
+sync.webdav.set_up_title:
+  zh-CN: 连接 WebDAV
+  en: Connect WebDAV
+sync.webdav.login_title:
+  zh-CN: 重新登录 WebDAV
+  en: Sign in to WebDAV
+sync.webdav.url:
+  zh-CN: 地址
+  en: Address
+sync.webdav.username:
+  zh-CN: 用户名
+  en: Username
+sync.webdav.password:
+  zh-CN: 密码
+  en: Password
+sync.webdav.app_password:
+  zh-CN: 地址是服务器上放同步数据的文件夹，不存在会自动建。Nextcloud 要用「设置 › 安全」里生成的应用密码。
+  en: The address is the server folder sync goes in; it’s made if missing. For Nextcloud, use an app password from “Settings › Security”.
+sync.webdav.test:
+  zh-CN: 测试连接
+  en: Test connection
+sync.webdav.next:
+  zh-CN: 继续
+  en: Continue
+sync.webdav.connecting:
+  zh-CN: 正在连接…
+  en: Connecting…
+sync.webdav.test_ok:
+  zh-CN: 连接成功，可以在这里读写。
+  en: Connected. Sync can read and write there.
+sync.webdav.test_failed:
+  zh-CN: 连接失败
+  en: Couldn’t connect
+sync.webdav.url_invalid:
+  zh-CN: 地址要以 https:// 或 http:// 开头，比如 https://dav.example.com/ShellRS。
+  en: The address starts with https:// or http://, such as https://dav.example.com/ShellRS.
+sync.webdav.username_missing:
+  zh-CN: 输入用户名。
+  en: Enter the username.
+sync.webdav.password_missing:
+  zh-CN: 输入密码。
+  en: Enter the password.
+
+# The S3 dialog; its test, buttons and progress are WebDAV's.
+sync.s3.set_up_title:
+  zh-CN: 连接 S3
+  en: Connect S3
+sync.s3.login_title:
+  zh-CN: 更换 S3 访问密钥
+  en: Change S3 access key
+sync.s3.endpoint:
+  zh-CN: 服务地址
+  en: Endpoint
+sync.s3.region:
+  zh-CN: 区域
+  en: Region
+sync.s3.bucket:
+  zh-CN: 存储桶
+  en: Bucket
+sync.s3.prefix:
+  zh-CN: 桶里的文件夹
+  en: Folder in the bucket
+sync.s3.path_style:
+  zh-CN: 路径式地址（MinIO 等自建的服务要勾选）
+  en: Path-style addresses (for MinIO and other self-hosted services)
+sync.s3.access_key:
+  zh-CN: Access Key ID
+  en: Access key ID
+sync.s3.secret_key:
+  zh-CN: Secret Access Key
+  en: Secret access key
+sync.s3.note:
+  zh-CN: 区域留空就是 us-east-1，Cloudflare R2 填 auto。阿里云 OSS、腾讯云 COS 等填它们兼容 S3 的服务地址。
+  en: An empty region is us-east-1; Cloudflare R2’s is auto. For Alibaba Cloud OSS, Tencent Cloud COS and the like, enter their S3-compatible endpoint.
+sync.s3.endpoint_invalid:
+  zh-CN: 服务地址要以 https:// 或 http:// 开头，比如 Cloudflare R2 的 https://<ACCOUNT_ID>.r2.cloudflarestorage.com。
+  en: The endpoint starts with https:// or http://, such as Cloudflare R2’s https://<ACCOUNT_ID>.r2.cloudflarestorage.com.
+sync.s3.bucket_invalid:
+  zh-CN: 输入存储桶的名称。
+  en: Enter the bucket’s name.
+sync.s3.access_key_missing:
+  zh-CN: 输入 Access Key ID。
+  en: Enter the access key ID.
+sync.s3.secret_key_missing:
+  zh-CN: 输入 Secret Access Key。
+  en: Enter the secret access key.

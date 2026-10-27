@@ -722,9 +722,22 @@ host.store.copy_name:
 host.store.no_key_dir:
   zh-CN: 没有可以保存私钥的目录
   en: There’s no folder to keep private keys in
+host.store.key_unreadable:
+  zh-CN: 读不出这个私钥文件，或它太大，不像私钥
+  en: Couldn’t read the key file, or it’s too large to be a key
 host.store.key_not_deleted:
   zh-CN: ShellRS 保存的私钥未能删除：%{error}
   en: "Couldn’t delete a private key ShellRS keeps: %{error}"
+
+host.store.sync.not_saved:
+  zh-CN: 同步来的改动未能保存，这一轮没有应用：%{error}
+  en: "Couldn’t save what sync brought, so none of it was applied: %{error}"
+host.store.sync.secret_not_saved:
+  zh-CN: 同步来的密码或私钥未能保存到这台设备：%{error}
+  en: "Couldn’t keep a synced password or key on this device: %{error}"
+host.store.sync.state_not_saved:
+  zh-CN: 同步状态未能保存：%{error}
+  en: "Couldn’t save the sync state: %{error}"
 
 host.store.secret.password_write:
   zh-CN: 密码未能写入系统钥匙串：%{error}
@@ -754,7 +767,14 @@ host.store.secret.temporary:
   zh-CN: 这次连接的密码未能记下：%{error}
   en: "Couldn’t keep the password for this connection: %{error}"
 
+host.store.secret.sync_keyring:
+  zh-CN: 同步的密钥未能在钥匙串里更新：%{error}
+  en: "Couldn’t update the sync keys in the keychain: %{error}"
+
 # 导入主机: the dialog that adds the hosts ~/.ssh/config or known_hosts names.
+host.import.key_not_copied:
+  zh-CN: 私钥未能复制到 ShellRS 保存私钥的目录，凭据仍用原文件：%{error}
+  en: "Couldn’t copy a key to the folder ShellRS keeps keys in, so its credential uses the file where it is: %{error}"
 host.import.title.ssh_config:
   zh-CN: 从 ~/.ssh/config 导入
   en: Import from ~/.ssh/config

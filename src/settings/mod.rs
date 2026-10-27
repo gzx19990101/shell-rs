@@ -10,14 +10,16 @@ mod settings_panel;
 mod shortcuts_editor;
 mod sidebar_tools;
 mod store;
+mod sync_page;
 mod terminal_themes;
 
 pub use apply::apply;
 pub use model::{
     AnalyticsSettings, AppSettings, Appearance, Choice, DEFAULT_INTERFACE_FONT_SIZE,
     ExternalCliSettings, INTERFACE_FONT_SIZE_RANGE, InterfaceLanguage, InterfaceSettings,
-    LocalTerminalSettings, NotificationSettings, SidebarTools, TerminalFontSettings,
-    TerminalHighlightSettings, TerminalThemeSettings, UpdateSettings, WindowSettings,
+    LocalTerminalSettings, NotificationSettings, SidebarTools, SyncLocation, SyncSettings,
+    TerminalFontSettings, TerminalHighlightSettings, TerminalThemeSettings, UpdateSettings,
+    WindowSettings,
 };
 pub use settings_panel::{SettingsPanel, SettingsPanelEvent};
 pub use store::{SettingsProblem, SettingsStore, SettingsStoreEvent};

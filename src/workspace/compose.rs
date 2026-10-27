@@ -1,0 +1,231 @@
+//! 撰写窗格 in the workspace: the bottom dock holds it while it shows, and
+//! what it holds goes to the terminal in front, the one the right sidebar
+//! goes with, or to every checked terminal while 命令广播 has two.
+
+use gpui_kit::component::WindowExt as _;
+use gpui_kit::component::dock::{DockLayout, DockPlacement, panel_handle};
+use gpui_kit::component::notification::Notification;
+use gpui_kit::*;
+
+use super::Workspace;
+use super::compose_pane::ComposeTarget;
+use super::terminal_groups::Recipient;
+use crate::app::{SendCompose, SendComposeInterrupt, SendComposeSnippet, ToggleComposePane};
+use crate::i18n::{join_list, t};
+use crate::terminal::{ComposePaneShown, TerminalInput};
+
+/// How tall the pane opens, title bar included: a few lines to write in.
+/// Dock geometry is an API boundary that takes `Pixels`.
+pub(super) const COMPOSE_HEIGHT: Pixels = px(160.);
+/// The lowest it can be dragged: its title bar and a line or two.
+const COMPOSE_MIN_HEIGHT: Pixels = px(96.);
+
+impl Workspace {
+    /// Where the pane sends.
+    fn compose_recipients(&self, cx: &App) -> Vec<Recipient> {
+        if self.broadcast.active() {
+            return self.broadcast_recipients(cx);
+        }
+        self.tool_target(cx)
+            .and_then(|target| self.recipient(target.tab(), cx))
+            .into_iter()
+            .collect()
+    }
+
+    /// Where the pane sends, as its title tells: none without a terminal
+    /// on screen.
+    fn compose_target(&self, cx: &App) -> Option<ComposeTarget> {
+        if self.broadcast.active() {
+            return Some(ComposeTarget::Broadcast(self.broadcast.count()));
+        }
+        let target = self.tool_target(cx)?;
+        let recipient = self.recipient(target.tab(), cx)?;
+        Some(ComposeTarget::Terminal(recipient.name))
+    }
+
+    /// Show the pane while it is switched on, or while 命令广播 sends, and
+    /// a terminal is on screen; tell it where it sends.
+    pub(super) fn sync_compose(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let target = self.compose_target(cx);
+        let wanted = self.settings().read(cx).settings().compose_pane || self.broadcast.active();
+        let show = wanted && target.is_some();
+        if let Some(target) = target {
+            let keys = self.broadcast.keys();
+            self.compose
+                .update(cx, |pane, cx| pane.set_target(target, keys, cx));
+        }
+        cx.set_global(ComposePaneShown(show));
+        if self.dock_area.read(cx).has_dock(DockPlacement::Bottom) == show {
+            return;
+        }
+        if show {
+            let pane = panel_handle(self.compose.clone());
+            let height = self.compose_height;
+            self.dock_area.update(cx, |area, cx| {
+                area.set_dock(
+                    DockPlacement::Bottom,
+                    DockLayout::tabs().panel_view(pane, cx),
+                    window,
+                    cx,
+                );
+                area.set_dock_size(DockPlacement::Bottom, height, window, cx);
+                // Its × and the shortcut are its controls, not gpui-kit's
+                // collapse button.
+                area.set_dock_collapsible(DockPlacement::Bottom, false, window, cx);
+            });
+        } else {
+            // The dock goes away, and the pane with it: what it holds stays
+            // for next time, and so does how tall it was.
+            let focus_inside = self
+                .compose
+                .read(cx)
+                .focus_handle(cx)
+                .contains_focused(window, cx);
+            if let Some(height) = self.dock_area.read(cx).dock_size(DockPlacement::Bottom) {
+                self.compose_height = height;
+            }
+            self.dock_area.update(cx, |area, cx| {
+                area.remove_dock(DockPlacement::Bottom, window, cx)
+            });
+            if focus_inside {
+                self.focus_center(window, cx);
+            }
+        }
+    }
+
+    /// Undo a drag that took the pane below its lowest. Runs whenever the
+    /// dock area changes, as the right sidebar's width is held.
+    pub(super) fn hold_compose_height(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let lower = self
+            .dock_area
+            .read(cx)
+            .dock_size(DockPlacement::Bottom)
+            .is_some_and(|height| height < COMPOSE_MIN_HEIGHT);
+        if lower {
+            self.dock_area.update(cx, |area, cx| {
+                area.set_dock_size(DockPlacement::Bottom, COMPOSE_MIN_HEIGHT, window, cx);
+            });
+        }
+    }
+
+    /// Type in the pane once it is drawn. A tab the dock moved takes the
+    /// focus as it becomes active, which its group tells it from a spawned
+    /// task; this one comes after.
+    pub(super) fn focus_compose_soon(&self, window: &mut Window, cx: &mut Context<Self>) {
+        let pane = self.compose.clone();
+        cx.spawn_in(window, async move |_, cx| {
+            _ = cx.update(|window, cx| pane.update(cx, |pane, cx| pane.focus(window, cx)));
+        })
+        .detach();
+    }
+
+    /// Put `command` on the input line of each terminal the pane sends to
+    /// and with `run` run it. After whatever is typed there, not in its
+    /// place as 命令片段 does: as Xshell's and SecureCRT's send to all, and
+    /// clearing with Ctrl-E Ctrl-U rings bash's bell on an empty line and
+    /// means other things to network devices. Says which terminals could not
+    /// take it, and returns whether any did.
+    fn send_composed(
+        &mut self,
+        command: &str,
+        run: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        self.sync_broadcast(cx);
+        let mut sent = false;
+        // Why not, with the terminals it applies to, in the order met.
+        let mut refused: Vec<(SharedString, Vec<SharedString>)> = Vec::new();
+        for recipient in self.compose_recipients(cx) {
+            match recipient
+                .view
+                .update(cx, |view, cx| view.enter_command(command, run, false, cx))
+            {
+                Ok(()) => sent = true,
+                Err(why) => match refused.iter_mut().find(|(reason, _)| *reason == why) {
+                    Some((_, names)) => names.push(recipient.name),
+                    None => refused.push((why, vec![recipient.name])),
+                },
+            }
+        }
+        for (why, names) in refused {
+            let message = t!(
+                "workspace.compose.refused",
+                names = join_list(&names),
+                error = why
+            );
+            window.push_notification(Notification::error(message), cx);
+        }
+        sent
+    }
+
+    /// Show or hide the pane. While 命令广播 sends it stays, as the
+    /// broadcast's command bar: the keyboard goes there instead.
+    pub(super) fn on_toggle_compose_pane(
+        &mut self,
+        _: &ToggleComposePane,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.broadcast.active() {
+            self.focus_compose_soon(window, cx);
+            return;
+        }
+        // Nothing to write to: no terminal on screen.
+        if self.compose_target(cx).is_none() {
+            return;
+        }
+        let open = !self.settings().read(cx).settings().compose_pane;
+        self.settings().update(cx, |settings, cx| {
+            settings.update(|s| s.compose_pane = open, cx)
+        });
+        self.sync_compose(window, cx);
+        if open {
+            self.focus_compose_soon(window, cx);
+        } else {
+            self.focus_center(window, cx);
+        }
+        cx.notify();
+    }
+
+    pub(super) fn on_send_compose(
+        &mut self,
+        _: &SendCompose,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let text = self.compose.read(cx).text(cx);
+        // A last line ended would run once more, empty.
+        let command = text.trim_end_matches(['\r', '\n']);
+        // What could not be sent anywhere stays, to send again.
+        if self.send_composed(command, true, window, cx) {
+            self.compose.update(cx, |pane, cx| pane.clear(window, cx));
+        }
+    }
+
+    pub(super) fn on_send_compose_snippet(
+        &mut self,
+        action: &SendComposeSnippet,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(snippet) = self.store.read(cx).snippet(action.0).cloned() else {
+            return;
+        };
+        self.send_composed(&snippet.command, snippet.run_on_click, window, cx);
+    }
+
+    pub(super) fn on_send_compose_interrupt(
+        &mut self,
+        _: &SendComposeInterrupt,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.sync_broadcast(cx);
+        for recipient in self.compose_recipients(cx) {
+            recipient.view.update(cx, |view, cx| {
+                view.receive_input(&TerminalInput::Bytes(vec![0x03]), cx);
+            });
+        }
+    }
+}

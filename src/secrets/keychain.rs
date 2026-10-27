@@ -8,8 +8,9 @@ use crate::i18n::{t, tn};
 /// 真正的系统钥匙串。
 ///
 /// macOS 上未签名的开发构建每次重新编译后都会被 Keychain Services 当成另一个
-/// 程序，于是弹一次系统授权框。那个框由 SecurityAgent 进程绘制，只会卡住发起
-/// 调用的线程，所以调用方必须待在后台线程上。
+/// 程序，于是弹一次系统授权框（设了 `SHELLRS_SIGN_IDENTITY` 时 `cargo run` 先用
+/// 固定证书签名，就不会，见 `scripts/macos-run.sh`）。那个框由 SecurityAgent
+/// 进程绘制，只会卡住发起调用的线程，所以调用方必须待在后台线程上。
 pub struct KeychainSecretStore {
     available: bool,
 }

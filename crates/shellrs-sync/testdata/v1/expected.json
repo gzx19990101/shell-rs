@@ -1,0 +1,307 @@
+[
+  {
+    "kind": "bookmark",
+    "id": "72d33807867b8ba2b5da03828d10a0d9",
+    "v": [
+      1800000000005,
+      0,
+      "k3jq8x0m2pa7d4vn"
+    ],
+    "data": {
+      "host": "h1",
+      "path": "/var/log",
+      "sort_order": 0
+    }
+  },
+  {
+    "kind": "credential",
+    "id": "c1",
+    "v": [
+      1800000000001,
+      0,
+      "k3jq8x0m2pa7d4vn"
+    ],
+    "data": {
+      "name": "deploy key",
+      "kind": "key",
+      "username": "deploy",
+      "sort_order": 1
+    }
+  },
+  {
+    "kind": "forward",
+    "id": "f1",
+    "v": [
+      1800000000006,
+      0,
+      "k3jq8x0m2pa7d4vn"
+    ],
+    "data": {
+      "host": "h1",
+      "name": "db",
+      "kind": "local",
+      "bind_host": "127.0.0.1",
+      "bind_port": 5432,
+      "target_host": "db.internal",
+      "target_port": 5432,
+      "sort_order": 0
+    }
+  },
+  {
+    "kind": "forward",
+    "id": "f2",
+    "v": [
+      1800000000007,
+      0,
+      "k3jq8x0m2pa7d4vn"
+    ],
+    "data": {
+      "host": "h1",
+      "name": "",
+      "kind": "dynamic",
+      "bind_host": "127.0.0.1",
+      "bind_port": 1080,
+      "target_host": null,
+      "target_port": null,
+      "sort_order": 1
+    }
+  },
+  {
+    "kind": "group",
+    "id": "g1",
+    "v": [
+      1800000000000,
+      0,
+      "k3jq8x0m2pa7d4vn"
+    ],
+    "data": {
+      "name": "Production",
+      "parent": "g0",
+      "sort_order": 3
+    }
+  },
+  {
+    "kind": "host",
+    "id": "gone",
+    "v": [
+      1800000000100,
+      2,
+      "k3jq8x0m2pa7d4vn"
+    ],
+    "deleted": true
+  },
+  {
+    "kind": "host",
+    "id": "h1",
+    "v": [
+      1800000000002,
+      0,
+      "k3jq8x0m2pa7d4vn"
+    ],
+    "data": {
+      "name": "web",
+      "address": "10.0.0.1",
+      "port": 22,
+      "group": null,
+      "sort_order": 0,
+      "protocol": "ssh",
+      "auth": "password",
+      "username": "root",
+      "credential": null,
+      "route": "direct",
+      "notes": ""
+    }
+  },
+  {
+    "kind": "host",
+    "id": "h2",
+    "v": [
+      1800000000003,
+      0,
+      "k3jq8x0m2pa7d4vn"
+    ],
+    "data": {
+      "name": "switch",
+      "address": "10.0.0.1",
+      "port": 22,
+      "group": null,
+      "sort_order": 0,
+      "protocol": "telnet",
+      "telnet": {
+        "user_prompt": "login:",
+        "pass_prompt": null
+      },
+      "auth": "credential",
+      "username": null,
+      "credential": "c1",
+      "route": "jump",
+      "jumps": [
+        "h1",
+        null
+      ],
+      "notes": "behind the bastion"
+    }
+  },
+  {
+    "kind": "host",
+    "id": "h3",
+    "v": [
+      1800000000004,
+      0,
+      "k3jq8x0m2pa7d4vn"
+    ],
+    "data": {
+      "name": "console",
+      "address": "10.0.0.3",
+      "port": 22,
+      "group": null,
+      "sort_order": 0,
+      "protocol": "ssh",
+      "auth": "password",
+      "username": "root",
+      "credential": null,
+      "route": "proxy",
+      "proxy": {
+        "kind": "socks5",
+        "host": "proxy",
+        "port": 1080,
+        "username": "me"
+      },
+      "notes": ""
+    }
+  },
+  {
+    "kind": "secret.credential",
+    "id": "c2",
+    "v": [
+      1800000000013,
+      0,
+      "k3jq8x0m2pa7d4vn"
+    ],
+    "data": {
+      "value": "test credential password"
+    }
+  },
+  {
+    "kind": "secret.future",
+    "id": "x1",
+    "v": [
+      1800000000050,
+      0,
+      "k3jq8x0m2pa7d4vn"
+    ],
+    "data": {
+      "value": "test future secret"
+    }
+  },
+  {
+    "kind": "secret.passphrase",
+    "id": "c1",
+    "v": [
+      1800000000014,
+      0,
+      "k3jq8x0m2pa7d4vn"
+    ],
+    "data": {
+      "value": "test passphrase"
+    }
+  },
+  {
+    "kind": "secret.password",
+    "id": "d77135a34ae21caa8c447127813e0d80",
+    "v": [
+      1800000000011,
+      0,
+      "k3jq8x0m2pa7d4vn"
+    ],
+    "data": {
+      "user": "root",
+      "host": "10.0.0.1",
+      "port": 22,
+      "value": "test password"
+    }
+  },
+  {
+    "kind": "secret.private_key",
+    "id": "c1",
+    "v": [
+      1800000000015,
+      0,
+      "k3jq8x0m2pa7d4vn"
+    ],
+    "data": {
+      "value": "-----BEGIN OPENSSH PRIVATE KEY-----\ntest key\n-----END OPENSSH PRIVATE KEY-----\n"
+    }
+  },
+  {
+    "kind": "secret.proxy",
+    "id": "6a4e79ce560ac1605d722ba6f878d5d1",
+    "v": [
+      1800000000012,
+      0,
+      "k3jq8x0m2pa7d4vn"
+    ],
+    "data": {
+      "user": "me",
+      "host": "proxy",
+      "port": 1080,
+      "value": "test proxy password"
+    }
+  },
+  {
+    "kind": "snippet",
+    "id": "s1",
+    "v": [
+      1800000000009,
+      0,
+      "k3jq8x0m2pa7d4vn"
+    ],
+    "data": {
+      "category": "s0",
+      "name": "disk",
+      "command": "df -h",
+      "scope": "host",
+      "scope_id": "h1",
+      "run_on_click": true
+    }
+  },
+  {
+    "kind": "snippet",
+    "id": "s2",
+    "v": [
+      1800000000010,
+      0,
+      "k3jq8x0m2pa7d4vn"
+    ],
+    "data": {
+      "category": null,
+      "name": "uptime",
+      "command": "uptime",
+      "scope": "all",
+      "scope_id": null,
+      "run_on_click": false
+    }
+  },
+  {
+    "kind": "snippet_category",
+    "id": "s0",
+    "v": [
+      1800000000008,
+      0,
+      "k3jq8x0m2pa7d4vn"
+    ],
+    "data": {
+      "name": "Ops"
+    }
+  },
+  {
+    "kind": "tag",
+    "id": "t1",
+    "v": [
+      1800000000100,
+      2,
+      "k3jq8x0m2pa7d4vn"
+    ],
+    "deleted": true
+  }
+]

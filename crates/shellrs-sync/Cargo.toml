@@ -1,0 +1,31 @@
+[package]
+name = "shellrs-sync"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "ShellRS sync core: encrypted per-device snapshots in plain file stores"
+license = "MIT"
+repository = "https://github.com/since2006/shell-rs"
+
+[dependencies]
+argon2 = { version = "0.6", default-features = false, features = ["alloc", "zeroize"] }
+chacha20poly1305 = { version = "0.11", default-features = false, features = ["alloc", "zeroize"] }
+flate2 = "1"
+getrandom = "0.3"
+# S3's request signatures.
+hmac = "0.13"
+# WebDAV's listings.
+quick-xml = "0.41"
+# WebDAV, as the app already uses it: blocking calls, on a worker thread.
+reqwest = { version = "0.13", features = ["blocking"] }
+serde = { version = "1", features = ["derive"] }
+# Keys keep their order, so a record nobody edited is written back as it
+# came, and this crate's tests see the same order alone as in the app.
+serde_json = { version = "1", features = ["preserve_order"] }
+sha2 = "0.11"
+# The sync password, as NFC, so every keyboard and system types the same key.
+unicode-normalization = "0.1"
+zeroize = "1"
+
+[dev-dependencies]
+tempfile = "3"

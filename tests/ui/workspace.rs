@@ -6,6 +6,28 @@ use gpui_kit::component::{
     Placement,
     dock::{DockPlacement, InsertTarget, PanelId},
 };
+use shellrs::app::Shortcut;
+
+/// Bind the close-tab shortcut to a key the terminal does not claim.
+///
+/// Ctrl with a letter is the shell's in a terminal (see
+/// `shell_keys_in_terminal`), and the default key for closing a tab is
+/// Ctrl+W on every platform but macOS, so the shortcut would go to the
+/// shell there. Ctrl and Shift with a letter is the app's everywhere.
+fn bind_close_tab(workspace: &Entity<Workspace>, cx: &mut TestAppContext) {
+    let shortcut = Shortcut::find("close-tab").expect("the close-tab shortcut");
+    cx.update(|cx| {
+        workspace.update(cx, |workspace, cx| {
+            workspace.settings().update(cx, |settings, cx| {
+                settings.update(
+                    |settings| settings.shortcuts.set(shortcut, "ctrl-shift-w".into()),
+                    cx,
+                )
+            })
+        })
+    });
+    cx.run_until_parked();
+}
 
 #[gpui_kit::test]
 fn tab_close_button_closes_the_terminal_and_disconnects(cx: &mut TestAppContext) {
@@ -324,7 +346,8 @@ async fn recent_host_menu_commands_work_from_the_start_page(cx: &mut TestAppCont
 
 #[gpui_kit::test]
 fn close_shortcut_closes_the_displayed_tab_down_to_none(cx: &mut TestAppContext) {
-    let (handle, _) = open_workspace(cx);
+    let (handle, workspace) = open_workspace(cx);
+    bind_close_tab(&workspace, cx);
 
     cx.update_window(handle.into(), |_, window, cx| {
         window.render_frame(cx);
@@ -339,7 +362,7 @@ fn close_shortcut_closes_the_displayed_tab_down_to_none(cx: &mut TestAppContext)
         window.render_frame(cx);
         // The new tab is displayed, with its input focused.
         assert!(window.find(("terminal", FIRST_NEW_TERMINAL)).visible());
-        window.press("secondary-w", cx);
+        window.press("ctrl-shift-w", cx);
     })
     .unwrap();
     cx.run_until_parked();
@@ -349,14 +372,14 @@ fn close_shortcut_closes_the_displayed_tab_down_to_none(cx: &mut TestAppContext)
         assert!(window.try_find(("terminal", FIRST_NEW_TERMINAL)).is_none());
         assert!(window.try_find("recent-hosts").is_none());
         // Keep closing whichever tab the dock displays next.
-        window.press("secondary-w", cx);
+        window.press("ctrl-shift-w", cx);
     })
     .unwrap();
     cx.run_until_parked();
 
     cx.update_window(handle.into(), |_, window, cx| {
         window.render_frame(cx);
-        window.press("secondary-w", cx);
+        window.press("ctrl-shift-w", cx);
     })
     .unwrap();
     cx.run_until_parked();
@@ -375,7 +398,7 @@ fn close_shortcut_closes_the_displayed_tab_down_to_none(cx: &mut TestAppContext)
         );
         assert!(window.find("recent-hosts").visible());
         // With nothing open the shortcut does nothing.
-        window.press("secondary-w", cx);
+        window.press("ctrl-shift-w", cx);
     })
     .unwrap();
     cx.run_until_parked();
@@ -480,6 +503,92 @@ async fn double_clicking_a_tab_toggles_the_host_sidebar(cx: &mut TestAppContext)
     .unwrap();
     cx.run_until_parked();
     assert!(sidebar_shown(cx));
+}
+
+/// A middle click on a tab's title closes the tab, as its × does; the
+/// other tabs stay.
+#[gpui_kit::test]
+async fn middle_clicking_a_tab_closes_it(cx: &mut TestAppContext) {
+    let (handle, workspace) = open_workspace(cx);
+    cx.run_until_parked();
+    cx.update_window(handle.into(), |_, window, cx| {
+        window.render_frame(cx);
+        let title = window
+            .find(("terminal-tab", INITIAL_WEB_TERMINAL))
+            .bounds()
+            .center();
+        button_click_at(
+            window,
+            title,
+            MouseButton::Middle,
+            gpui_kit::Modifiers::default(),
+            cx,
+        );
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update(|cx| {
+        let workspace = workspace.read(cx);
+        assert!(
+            workspace
+                .remote_terminal(RemoteTerminalId(INITIAL_WEB_TERMINAL))
+                .is_none()
+        );
+        assert!(
+            workspace
+                .remote_terminal(RemoteTerminalId(INITIAL_STAGING_TERMINAL))
+                .is_some()
+        );
+    });
+}
+
+/// A mouse wheel brings back tabs scrolled out of view, though the tab bar
+/// scrolls only sideways and a wheel turns only vertically (#66).
+#[gpui_kit::test]
+fn the_mouse_wheel_scrolls_the_tabs(cx: &mut TestAppContext) {
+    let (handle, _) = open_workspace(cx);
+    for _ in 0..30 {
+        cx.update_window(handle.into(), |_, window, cx| {
+            window.render_frame(cx);
+            window.dispatch_action(Box::new(ConnectHost(HostId(WEB_01))), cx);
+        })
+        .unwrap();
+        cx.run_until_parked();
+    }
+    // The bar and where the first tab starts.
+    let layout = |cx: &mut TestAppContext| {
+        cx.update_window(handle.into(), |_, window, cx| {
+            window.render_frame(cx);
+            let bar = window.find("center-tab-bar").bounds();
+            let tab = window.find(("terminal-tab", INITIAL_WEB_TERMINAL)).bounds();
+            (bar, tab.left())
+        })
+        .unwrap()
+    };
+
+    // The last tab opened is shown, the first scrolled out to the left.
+    let (bar, before) = layout(cx);
+    assert!(before < bar.left());
+
+    cx.update_window(handle.into(), |_, window, cx| {
+        window.dispatch_event(
+            gpui_kit::ScrollWheelEvent {
+                position: bar.center(),
+                delta: gpui_kit::ScrollDelta::Lines(point(0., 3.)),
+                modifiers: gpui_kit::Modifiers::default(),
+                touch_phase: gpui_kit::TouchPhase::Moved,
+            }
+            .to_platform_input(),
+            cx,
+        );
+    })
+    .unwrap();
+    cx.run_until_parked();
+    let (_, after) = layout(cx);
+    assert!(
+        after > before,
+        "the tabs did not scroll: {before:?} → {after:?}"
+    );
 }
 
 #[gpui_kit::test]

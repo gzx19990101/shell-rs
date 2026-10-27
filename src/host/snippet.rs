@@ -7,7 +7,7 @@ use std::cmp::Ordering;
 
 use gpui_kit::SharedString;
 
-use super::{GroupId, HostId};
+use super::{GroupId, HostId, PublicId};
 use crate::i18n::t;
 
 /// Stable identity of a snippet. Never reused within a process.
@@ -92,6 +92,10 @@ pub struct Snippet {
     pub category: Option<SnippetCategoryId>,
     pub scope: SnippetScope,
     pub run_on_click: bool,
+    /// The snippet's id on every device it syncs to.
+    pub sync_id: PublicId,
+    /// When the user last changed it; see [`super::Host::edited_ms`].
+    pub edited_ms: u64,
 }
 
 impl Snippet {
@@ -103,6 +107,8 @@ impl Snippet {
             category: draft.category,
             scope: draft.scope,
             run_on_click: draft.run_on_click,
+            sync_id: PublicId::generate(),
+            edited_ms: 0,
         }
     }
 
@@ -133,6 +139,21 @@ impl Snippet {
 pub struct SnippetCategory {
     pub id: SnippetCategoryId,
     pub name: SharedString,
+    /// The category's id on every device it syncs to.
+    pub sync_id: PublicId,
+    /// When the user last changed it; see [`super::Host::edited_ms`].
+    pub edited_ms: u64,
+}
+
+impl SnippetCategory {
+    pub fn new(id: SnippetCategoryId, name: impl Into<SharedString>) -> Self {
+        Self {
+            id,
+            name: name.into(),
+            sync_id: PublicId::generate(),
+            edited_ms: 0,
+        }
+    }
 }
 
 /// The order snippets and categories are listed in: by name, regardless of
